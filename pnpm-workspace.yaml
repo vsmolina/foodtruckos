@@ -1,0 +1,8 @@
+packages:
+  - 'apps/*'
+  - 'packages/*'
+
+# Native deps we don't run install scripts for (managed by Next/Tailwind toolchain).
+ignoredBuiltDependencies:
+  - sharp
+  - unrs-resolver
