@@ -1,0 +1,37 @@
+# Dev overlay: run the web app from source with hot reload instead of the
+# built image. Apply on top of the base file:
+#   docker compose -f infra/docker-compose.yml -f infra/docker-compose.dev.yml up
+#
+# The repo is mounted into the container. node_modules and .next live in
+# container-local volumes (host is macOS/arm, container is linux — binaries
+# differ, so they must NOT be shared).
+
+services:
+  web:
+    build:
+      context: ..
+      dockerfile: infra/Dockerfile.web
+      target: deps
+    environment:
+      NODE_ENV: development
+      DATABASE_URL: postgresql://${POSTGRES_USER:-foodtruck}:${POSTGRES_PASSWORD:-foodtruck}@postgres:5432/${POSTGRES_DB:-foodtruck}
+      REDIS_URL: redis://redis:6379
+    working_dir: /app
+    volumes:
+      - ..:/app
+      - web_node_modules:/app/node_modules
+      - web_app_node_modules:/app/apps/web/node_modules
+      - web_next_cache:/app/apps/web/.next
+    command:
+      - sh
+      - -c
+      - >-
+        corepack enable &&
+        pnpm install &&
+        pnpm --filter web db:migrate &&
+        pnpm --filter web exec next dev -H 0.0.0.0
+
+volumes:
+  web_node_modules:
+  web_app_node_modules:
+  web_next_cache:
