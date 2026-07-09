@@ -1,9 +1,8 @@
-import type * as Square from 'square';
 import { eq } from 'drizzle-orm';
 import { db } from '@/lib/db/client';
 import { webhookEvents } from '@/lib/db/schema';
 import { logger } from '@/lib/logger';
-import { ingestOrderById, ingestPayment, upsertOrder } from '@/lib/square/ingest';
+import { ingestOrderById, ingestPayment, upsertOrder, type RawPayment } from '@/lib/square/ingest';
 import { retrieveOrder } from '@/lib/square/client';
 import { SIGNATURE_HEADER, verifySignature } from '@/lib/square/webhook';
 
@@ -19,7 +18,7 @@ type SquareEvent = {
       order_created?: ThinOrder;
       order_updated?: ThinOrder;
       order_fulfillment_updated?: ThinOrder;
-      payment?: Square.Payment;
+      payment?: RawPayment;
     };
   };
 };

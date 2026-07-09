@@ -117,7 +117,25 @@ It prints the subscription id and Signature Key — copy the key into `.env`.
 
 ### 4. Drive an order
 
-Ring up an itemized order in the Square sandbox seller dashboard (or via
-`CreateOrder` + `CreatePayment` sandbox API calls). Watch the app logs and
-confirm the same rows/Redis message as in the mock flow. The Dashboard's
-**Send Test Event** button on the subscription is a quick smoke test.
+Fastest: ring one up over the API with the sandbox test card — this fires real
+`order.created` / `payment.created` / `order.updated` webhooks:
+
+```bash
+SQUARE_ACCESS_TOKEN=... SQUARE_ENVIRONMENT=sandbox SQUARE_LOCATION_ID=... \
+pnpm --filter web square:sandbox-order
+```
+
+Then confirm the same rows/Redis message as in the mock flow (orders +
+order_items + kitchen_ticket, and a `payments` row with the correct
+`amount_cents`, linked to the order). You can also ring up an order in the
+sandbox seller dashboard, or use the Dashboard's **Send Test Event** button.
+
+> **Exposing the app:** Square needs a public HTTPS URL. If you already run a
+> named Cloudflare tunnel, add an ingress rule for a subdomain
+> (`foodtruck.<domain> -> http://localhost:<port>`), `cloudflared tunnel route
+> dns <tunnel> foodtruck.<domain>`, and reload the connector. Set
+> `SQUARE_WEBHOOK_NOTIFICATION_URL` to that URL **exactly** — it's part of the
+> signature. A `trycloudflare.com` quick tunnel works too but its URL is
+> ephemeral (re-register the webhook when it changes), and note that an existing
+> named-tunnel `config.yml` with a `http_status:404` catch-all will 404 any
+> other hostname.

@@ -227,17 +227,29 @@ export async function ingestOrderById(orderId: string): Promise<void> {
   await upsertOrder(sqOrder);
 }
 
+// payment.* webhooks carry the FULL payment object, but as raw snake_case JSON
+// (not the SDK's camelCase shape). Model only the fields we persist.
+type RawMoney = { amount?: number | null; currency?: string | null };
+export type RawPayment = {
+  id?: string;
+  order_id?: string | null;
+  amount_money?: RawMoney | null;
+  tip_money?: RawMoney | null;
+  status?: string | null;
+  card_details?: { card?: { card_brand?: string | null } | null } | null;
+};
+
 /** Upsert a payment (read-only mirror in the MVP). */
-export async function ingestPayment(payment: Square.Payment): Promise<void> {
+export async function ingestPayment(payment: RawPayment): Promise<void> {
   const squarePaymentId = payment.id;
   if (!squarePaymentId) return;
 
   let orderId: string | null = null;
-  if (payment.orderId) {
+  if (payment.order_id) {
     const matched = await db
       .select({ id: orders.id })
       .from(orders)
-      .where(eq(orders.squareOrderId, payment.orderId))
+      .where(eq(orders.squareOrderId, payment.order_id))
       .limit(1);
     orderId = matched[0]?.id ?? null;
   }
@@ -245,10 +257,10 @@ export async function ingestPayment(payment: Square.Payment): Promise<void> {
   const values = {
     orderId,
     squarePaymentId,
-    amountCents: cents(payment.amountMoney),
-    tipCents: cents(payment.tipMoney),
+    amountCents: Number(payment.amount_money?.amount ?? 0),
+    tipCents: Number(payment.tip_money?.amount ?? 0),
     status: payment.status ?? 'UNKNOWN',
-    cardBrand: payment.cardDetails?.card?.cardBrand ?? null,
+    cardBrand: payment.card_details?.card?.card_brand ?? null,
     rawPayload: toJsonSafe(payment),
   };
 

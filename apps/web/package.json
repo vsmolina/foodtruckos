@@ -12,6 +12,7 @@
     "db:seed": "tsx lib/db/seed.ts",
     "square:locations": "tsx scripts/square-locations.ts",
     "square:register-webhook": "tsx scripts/register-square-webhook.ts",
+    "square:sandbox-order": "tsx scripts/create-sandbox-order.ts",
     "mock:square": "tsx scripts/mock-square.ts"
   },
   "dependencies": {
