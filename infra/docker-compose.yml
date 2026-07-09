@@ -69,6 +69,19 @@ services:
       retries: 6
       start_period: 30s
 
+  # Cloudflare Tunnel — exposes the app publicly so Square can reach the webhook
+  # endpoint. Remotely-managed (token) tunnel: the public hostname → service
+  # mapping (route your hostname to http://web:3000) is configured in the
+  # Cloudflare Zero Trust dashboard. Outbound-only; no ports published.
+  # Set CLOUDFLARE_TUNNEL_TOKEN in .env. Omit this service and it simply won't start.
+  cloudflared:
+    image: cloudflare/cloudflared:latest
+    restart: unless-stopped
+    command: tunnel --no-autoupdate run --token ${CLOUDFLARE_TUNNEL_TOKEN}
+    depends_on:
+      web:
+        condition: service_healthy
+
 volumes:
   postgres_data:
   redis_data:
