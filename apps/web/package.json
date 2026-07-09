@@ -9,15 +9,20 @@
     "lint": "eslint",
     "db:generate": "drizzle-kit generate",
     "db:migrate": "tsx lib/db/migrate.ts",
-    "db:seed": "tsx lib/db/seed.ts"
+    "db:seed": "tsx lib/db/seed.ts",
+    "square:locations": "tsx scripts/square-locations.ts",
+    "square:register-webhook": "tsx scripts/register-square-webhook.ts",
+    "mock:square": "tsx scripts/mock-square.ts"
   },
   "dependencies": {
     "drizzle-orm": "^0.45.2",
     "ioredis": "^5.11.1",
     "next": "16.2.10",
+    "pino": "^10.3.1",
     "postgres": "^3.4.9",
     "react": "19.2.4",
     "react-dom": "19.2.4",
+    "square": "^44.2.0",
     "uuidv7": "^1.2.1"
   },
   "devDependencies": {
