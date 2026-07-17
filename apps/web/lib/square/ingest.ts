@@ -11,6 +11,7 @@ import {
 } from '@/lib/db/schema';
 import { logger } from '@/lib/logger';
 import { publish } from '@/lib/realtime/channel';
+import type { KdsTicket } from '@/lib/kds/types';
 import { retrieveOrder } from './client';
 
 /** BigInt cents → number cents. Square amounts are always minor units. */
@@ -62,17 +63,7 @@ function displayNumber(squareOrderId: string): string {
   return `#${squareOrderId.slice(-4).toUpperCase()}`;
 }
 
-type TicketEvent = {
-  type: 'ticket:created' | 'ticket:updated' | 'ticket:removed';
-  ticket: {
-    id: string;
-    orderId: string;
-    number: string;
-    state: string;
-    startedAt: string;
-    items: { qty: number; name: string; notes: string | null; modifiers: string[] }[];
-  };
-};
+type TicketEvent = { type: 'ticket:created' | 'ticket:updated' | 'ticket:removed'; ticket: KdsTicket };
 
 /**
  * Upsert a hydrated Square order into our tables and (re)create its kitchen
@@ -188,15 +179,15 @@ export async function upsertOrder(sqOrder: Square.Order): Promise<void> {
           .returning();
       }
       if (!ticket) return null;
-      return { type: 'ticket:removed', ticket: toTicketPayload(ticket, orderRow.id, squareOrderId, items) };
+      return { type: 'ticket:removed', ticket: toTicketPayload(ticket, orderRow, items) };
     }
 
     if (!ticket) {
       [ticket] = await tx.insert(kitchenTickets).values({ orderId: orderRow.id }).returning();
       if (!ticket) throw new Error('failed to create kitchen ticket');
-      return { type: 'ticket:created', ticket: toTicketPayload(ticket, orderRow.id, squareOrderId, items) };
+      return { type: 'ticket:created', ticket: toTicketPayload(ticket, orderRow, items) };
     }
-    return { type: 'ticket:updated', ticket: toTicketPayload(ticket, orderRow.id, squareOrderId, items) };
+    return { type: 'ticket:updated', ticket: toTicketPayload(ticket, orderRow, items) };
   });
 
   if (event) {
@@ -207,16 +198,16 @@ export async function upsertOrder(sqOrder: Square.Order): Promise<void> {
 
 function toTicketPayload(
   ticket: typeof kitchenTickets.$inferSelect,
-  orderId: string,
-  squareOrderId: string,
-  items: TicketEvent['ticket']['items'],
-): TicketEvent['ticket'] {
+  order: typeof orders.$inferSelect,
+  items: KdsTicket['items'],
+): KdsTicket {
   return {
     id: ticket.id,
-    orderId,
-    number: displayNumber(squareOrderId),
+    orderId: order.id,
+    number: displayNumber(order.squareOrderId ?? order.id),
     state: ticket.state,
     startedAt: ticket.startedAt.toISOString(),
+    placedAt: order.openedAt.toISOString(),
     items,
   };
 }

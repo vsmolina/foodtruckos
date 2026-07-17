@@ -3,9 +3,9 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
-    "dev": "next dev",
+    "dev": "tsx watch server.ts",
     "build": "next build",
-    "start": "next start",
+    "start": "NODE_ENV=production tsx server.ts",
     "lint": "eslint",
     "db:generate": "drizzle-kit generate",
     "db:migrate": "tsx lib/db/migrate.ts",
@@ -13,7 +13,8 @@
     "square:locations": "tsx scripts/square-locations.ts",
     "square:register-webhook": "tsx scripts/register-square-webhook.ts",
     "square:sandbox-order": "tsx scripts/create-sandbox-order.ts",
-    "mock:square": "tsx scripts/mock-square.ts"
+    "mock:square": "tsx scripts/mock-square.ts",
+    "test:e2e": "playwright test"
   },
   "dependencies": {
     "drizzle-orm": "^0.45.2",
@@ -23,10 +24,13 @@
     "postgres": "^3.4.9",
     "react": "19.2.4",
     "react-dom": "19.2.4",
+    "socket.io": "^4.8.3",
+    "socket.io-client": "^4.8.3",
     "square": "^44.2.0",
     "uuidv7": "^1.2.1"
   },
   "devDependencies": {
+    "@playwright/test": "^1.61.1",
     "@tailwindcss/postcss": "^4",
     "@types/node": "^20",
     "@types/react": "^19",

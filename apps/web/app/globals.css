@@ -1,26 +1,105 @@
 @import 'tailwindcss';
 
+/* Design system — see docs/03-DESIGN-SYSTEM.md. Light theme is the default
+   (dashboard/admin); the KDS opts into dark via [data-theme='dark']. */
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
+  --bg: #f6f1e8;
+  --bg-raised: #fbf7ef;
+  --bg-sunken: #efe8da;
+  --ink: #14110e;
+  --ink-2: #3b352e;
+  --ink-3: #7a6f62;
+  --rule: #e0d6c4;
+  --accent: #c8441e;
+  --accent-ink: #ffffff;
+  --success: #2f6a3f;
+  --warn: #b5701a;
+  --danger: #a12e1c;
+
+  /* Design faces (docs/03-DESIGN-SYSTEM.md). Self-host from /public/fonts to
+     render the real faces; until then these fall back gracefully. */
+  --font-display: 'Fraunces', Georgia, serif;
+  --font-sans: 'IBM Plex Sans', system-ui, sans-serif;
+  --font-mono: 'JetBrains Mono', ui-monospace, SFMono-Regular, monospace;
+
+  --radius-sm: 2px;
+  --radius: 4px;
+  --radius-lg: 8px;
+
+  --ease: cubic-bezier(0.32, 0.72, 0, 1);
+  --ease-spring: cubic-bezier(0.5, 1.6, 0.4, 1);
+  --dur-3: 360ms;
+  --dur-4: 560ms;
+}
+
+[data-theme='dark'] {
+  --bg: #161310;
+  --bg-raised: #1f1c18;
+  --bg-sunken: #0f0d0b;
+  --ink: #f2eadc;
+  --ink-2: #beb4a3;
+  --ink-3: #7e7566;
+  --rule: #2a2520;
+  --accent: #e86a3e;
+  --accent-ink: #0f0d0b;
+  --success: #6ba778;
+  --warn: #e0a15a;
+  --danger: #d94f35;
 }
 
 @theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
+  --color-bg: var(--bg);
+  --color-bg-raised: var(--bg-raised);
+  --color-bg-sunken: var(--bg-sunken);
+  --color-ink: var(--ink);
+  --color-ink-2: var(--ink-2);
+  --color-ink-3: var(--ink-3);
+  --color-rule: var(--rule);
+  --color-accent: var(--accent);
+  --color-accent-ink: var(--accent-ink);
+  --color-success: var(--success);
+  --color-warn: var(--warn);
+  --color-danger: var(--danger);
+  --font-display: var(--font-display);
+  --font-sans: var(--font-sans);
+  --font-mono: var(--font-mono);
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
+html,
+body {
+  background: var(--bg);
+  color: var(--ink);
+  font-family: var(--font-sans);
+  font-size: 15px;
+  line-height: 1.55;
+}
+
+/* KDS card state animations. Degrade to nothing under reduced-motion. */
+@keyframes kds-enter {
+  from {
+    opacity: 0;
+    transform: scale(0.96) translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
   }
 }
 
-body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+@keyframes kds-pulse {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.95;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  * {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+  }
 }

@@ -75,6 +75,46 @@ the full webhook → hydrate → DB → Redis flow locally.
 
 ---
 
+## A2. KDS end-to-end (Playwright)
+
+`apps/web/tests/e2e/kds.spec.ts` drives the whole live path in a real browser:
+fire a signed `order.created` → ingest → DB → Redis → Socket.IO → the ticket
+renders on the board → tap → confirm → it clears. A second test fast-forwards the
+board clock to assert the 3-minute amber tier.
+
+```bash
+pnpm --filter web test:e2e
+```
+
+Playwright starts its own web server on port `3100` (`KDS_TEST_PORT`) in
+`SQUARE_MOCK=1` mode, so no Square account or network is needed. It still needs a
+live, migrated + seeded Postgres and Redis.
+
+**Two things to know:**
+
+- **It builds and runs a *production* server, not `dev`.** Next's dev server —
+  paired with our custom Socket.IO server (`server.ts`) — wedges under a real
+  browser: once the KDS page is open, Next's dev HMR/streaming connections block
+  the single custom HTTP server from handling *any* further request, so the
+  webhook POST that drives the test hangs forever. A prod build has no HMR and
+  serves fine. The `webServer.command` is therefore `next build && tsx server.ts`
+  (first run pays the ~15s build; `reuseExistingServer` skips it locally on
+  re-runs).
+
+- **Point it at the right DB/Redis if 5432/6379 are taken.** The config defaults
+  to the standard localhost ports, but `infra/docker-compose.yml` publishes
+  Postgres/Redis on *ephemeral* host ports (no fixed host mapping), and another
+  stack may already own 5432/6379. Check `docker ps` for the real ports and
+  override:
+
+  ```bash
+  DATABASE_URL=postgresql://foodtruck:foodtruck@localhost:5433/foodtruck \
+  REDIS_URL=redis://localhost:6380 \
+  pnpm --filter web test:e2e
+  ```
+
+---
+
 ## B. Real Square sandbox
 
 ### 1. Get your Location ID
