@@ -5,6 +5,7 @@ import {
   jsonb,
   pgEnum,
   pgTable,
+  primaryKey,
   text,
   timestamp,
   uuid,
@@ -256,4 +257,56 @@ export const webhookEvents = pgTable(
     uniqueIndex('webhook_events_external_id_uidx').on(t.externalId),
     index('webhook_events_event_type_idx').on(t.eventType),
   ],
+);
+
+// --- Auth.js (NextAuth v5) --------------------------------------------------
+// Tables required by @auth/drizzle-adapter. Column *property names* are
+// load-bearing (the adapter reads by JS key); DB column names may be snake_case.
+// We keep the project's uuid/v7 PK convention — the adapter accepts PgUUID ids.
+// `mode: 'date'` is required on token/expiry columns (the adapter passes Dates).
+// Magic-link (Nodemailer) sign-in uses the database session strategy.
+export const users = pgTable('users', {
+  id: id(),
+  name: text('name'),
+  email: text('email').unique(),
+  emailVerified: timestamp('email_verified', { withTimezone: true, mode: 'date' }),
+  image: text('image'),
+});
+
+export const accounts = pgTable(
+  'accounts',
+  {
+    userId: uuid('user_id')
+      .notNull()
+      .references(() => users.id, { onDelete: 'cascade' }),
+    type: text('type').notNull(),
+    provider: text('provider').notNull(),
+    providerAccountId: text('provider_account_id').notNull(),
+    refresh_token: text('refresh_token'),
+    access_token: text('access_token'),
+    expires_at: integer('expires_at'),
+    token_type: text('token_type'),
+    scope: text('scope'),
+    id_token: text('id_token'),
+    session_state: text('session_state'),
+  },
+  (t) => [primaryKey({ columns: [t.provider, t.providerAccountId] })],
+);
+
+export const sessions = pgTable('sessions', {
+  sessionToken: text('session_token').primaryKey(),
+  userId: uuid('user_id')
+    .notNull()
+    .references(() => users.id, { onDelete: 'cascade' }),
+  expires: timestamp('expires', { withTimezone: true, mode: 'date' }).notNull(),
+});
+
+export const verificationTokens = pgTable(
+  'verification_tokens',
+  {
+    identifier: text('identifier').notNull(),
+    token: text('token').notNull(),
+    expires: timestamp('expires', { withTimezone: true, mode: 'date' }).notNull(),
+  },
+  (t) => [primaryKey({ columns: [t.identifier, t.token] })],
 );

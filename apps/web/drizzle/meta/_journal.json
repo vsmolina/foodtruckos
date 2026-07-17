@@ -8,6 +8,13 @@
       "when": 1783045798394,
       "tag": "0000_fixed_sumo",
       "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "7",
+      "when": 1784322274424,
+      "tag": "0001_smooth_norrin_radd",
+      "breakpoints": true
     }
   ]
 }
