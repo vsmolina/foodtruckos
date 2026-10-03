@@ -1,6 +1,14 @@
-import { sql, type SQL } from 'drizzle-orm';
+import { asc, eq, inArray, sql, type SQL } from 'drizzle-orm';
 import { db } from '@/lib/db/client';
-import { orderStatus } from '@/lib/db/schema';
+import {
+  kitchenTickets,
+  orderItemModifiers,
+  orderItems,
+  orderStatus,
+  orders,
+  payments,
+  stores,
+} from '@/lib/db/schema';
 import { businessTimezone } from './metrics';
 
 // Order history for the dashboard's /orders page. Dates are calendar days in the
@@ -101,5 +109,51 @@ export async function listOrders(filters: OrderFilters): Promise<OrderPage> {
     total,
     page,
     pageCount,
+  };
+}
+
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+export type OrderDetail = {
+  order: typeof orders.$inferSelect & { storeName: string };
+  items: (typeof orderItems.$inferSelect & {
+    modifiers: (typeof orderItemModifiers.$inferSelect)[];
+  })[];
+  payments: (typeof payments.$inferSelect)[];
+  ticket: typeof kitchenTickets.$inferSelect | null;
+};
+
+/** Everything about one order, for /orders/[id]. null if the id is unknown or malformed. */
+export async function getOrderDetail(id: string): Promise<OrderDetail | null> {
+  // Postgres rejects a non-uuid literal with an error; treat it as not found.
+  if (!UUID_RE.test(id)) return null;
+
+  const [row] = await db
+    .select({ order: orders, storeName: stores.name })
+    .from(orders)
+    .innerJoin(stores, eq(stores.id, orders.storeId))
+    .where(eq(orders.id, id))
+    .limit(1);
+  if (!row) return null;
+
+  const [items, pays, tickets] = await Promise.all([
+    db.select().from(orderItems).where(eq(orderItems.orderId, id)).orderBy(asc(orderItems.id)),
+    db.select().from(payments).where(eq(payments.orderId, id)).orderBy(asc(payments.createdAt)),
+    db.select().from(kitchenTickets).where(eq(kitchenTickets.orderId, id)).limit(1),
+  ]);
+
+  const mods = items.length
+    ? await db
+        .select()
+        .from(orderItemModifiers)
+        .where(inArray(orderItemModifiers.orderItemId, items.map((i) => i.id)))
+        .orderBy(asc(orderItemModifiers.id))
+    : [];
+
+  return {
+    order: { ...row.order, storeName: row.storeName },
+    items: items.map((i) => ({ ...i, modifiers: mods.filter((m) => m.orderItemId === i.id) })),
+    payments: pays,
+    ticket: tickets[0] ?? null,
   };
 }

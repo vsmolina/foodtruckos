@@ -28,7 +28,7 @@ export function orderNumber(squareOrderId: string | null, id: string): string {
 }
 
 /** Short date + time in the given timezone, e.g. "Oct 3, 1:07 PM". */
-export function dateTime(iso: string, timeZone = 'America/Chicago'): string {
+export function dateTime(iso: string | Date, timeZone = 'America/Chicago'): string {
   return new Date(iso).toLocaleString('en-US', {
     month: 'short',
     day: 'numeric',
