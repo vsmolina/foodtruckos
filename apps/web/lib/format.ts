@@ -8,6 +8,22 @@ export function money(cents: number): string {
   return USD.format(cents / 100);
 }
 
+/** Cents → plain dollars for an input's value: 1234 → "12.34". */
+export function dollarsInput(cents: number): string {
+  return (cents / 100).toFixed(2);
+}
+
+/**
+ * Parse typed dollars into integer cents: "12", "12.5", "$12.34", "-0.50".
+ * Never goes through float math. Returns null for anything else (or > 2 decimals).
+ */
+export function parseDollars(input: string): number | null {
+  const m = /^(-)?\$?(\d{1,5})(?:\.(\d{1,2}))?$/.exec(input.trim().replace(/,/g, ''));
+  if (!m) return null;
+  const cents = Number(m[2]) * 100 + Number((m[3] ?? '').padEnd(2, '0'));
+  return m[1] ? -cents : cents;
+}
+
 /** Seconds → "M:SS" (or "H:MM:SS" past an hour). null → "—". */
 export function duration(seconds: number | null | undefined): string {
   if (seconds == null) return '—';
