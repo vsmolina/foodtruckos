@@ -1,4 +1,5 @@
 import {
+  bigint,
   boolean,
   index,
   integer,
@@ -35,6 +36,8 @@ export const kitchenTicketState = pgEnum('kitchen_ticket_state', [
   'done',
   'cancelled',
 ]);
+// Menu → Square Catalog sync state (Phase 5). 'local' = never pushed.
+export const squareSyncStatus = pgEnum('square_sync_status', ['local', 'pending', 'synced', 'error']);
 
 // --- Business / stores ------------------------------------------------------
 export const businesses = pgTable('businesses', {
@@ -55,6 +58,10 @@ export const stores = pgTable(
       .references(() => businesses.id),
     name: text('name').notNull(),
     squareLocationId: text('square_location_id').unique(),
+    // Last successful "Pull from Square" catalog import. Pushing menu edits to a
+    // production catalog is refused until this is set, so placeholder seed data
+    // can never overwrite the real POS menu.
+    catalogPulledAt: timestamp('catalog_pulled_at', { withTimezone: true }),
     createdAt: createdAt(),
     updatedAt: updatedAt(),
   },
@@ -71,8 +78,12 @@ export const menuCategories = pgTable(
       .references(() => stores.id),
     name: text('name').notNull(),
     sortOrder: integer('sort_order').notNull().default(0),
-    // Square CatalogCategory id.
+    // Square CatalogCategory id + its object version (needed for the next upsert).
     squareId: text('square_id'),
+    squareVersion: bigint('square_version', { mode: 'number' }),
+    syncStatus: squareSyncStatus('sync_status').notNull().default('local'),
+    syncError: text('sync_error'),
+    syncedAt: timestamp('synced_at', { withTimezone: true }),
     createdAt: createdAt(),
     updatedAt: updatedAt(),
   },
@@ -92,6 +103,10 @@ export const menuItems = pgTable(
     isAvailable: boolean('is_available').notNull().default(true),
     // Square CatalogItem id. Price is NOT here — it lives on the variation.
     squareId: text('square_id'),
+    squareVersion: bigint('square_version', { mode: 'number' }),
+    syncStatus: squareSyncStatus('sync_status').notNull().default('local'),
+    syncError: text('sync_error'),
+    syncedAt: timestamp('synced_at', { withTimezone: true }),
     createdAt: createdAt(),
     updatedAt: updatedAt(),
   },
@@ -108,8 +123,9 @@ export const menuItemVariations = pgTable(
       .references(() => menuItems.id),
     name: text('name').notNull(),
     priceCents: integer('price_cents').notNull(),
-    // Square ItemVariation id.
+    // Square ItemVariation id + version.
     squareId: text('square_id'),
+    squareVersion: bigint('square_version', { mode: 'number' }),
     isDefault: boolean('is_default').notNull().default(false),
     createdAt: createdAt(),
     updatedAt: updatedAt(),
@@ -127,9 +143,11 @@ export const menuModifiers = pgTable(
     name: text('name').notNull(),
     priceCentsDelta: integer('price_cents_delta').notNull().default(0),
     isRequired: boolean('is_required').notNull().default(false),
-    // Square CatalogModifier id and its parent ModifierList id.
+    // Square CatalogModifier id and its parent ModifierList id, with versions.
     squareId: text('square_id'),
+    squareVersion: bigint('square_version', { mode: 'number' }),
     squareModifierListId: text('square_modifier_list_id'),
+    squareModifierListVersion: bigint('square_modifier_list_version', { mode: 'number' }),
     createdAt: createdAt(),
     updatedAt: updatedAt(),
   },
