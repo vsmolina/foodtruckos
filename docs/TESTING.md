@@ -92,14 +92,20 @@ live, migrated + seeded Postgres and Redis.
 
 **Two things to know:**
 
-- **It builds and runs a *production* server, not `dev`.** Next's dev server —
-  paired with our custom Socket.IO server (`server.ts`) — wedges under a real
-  browser: once the KDS page is open, Next's dev HMR/streaming connections block
-  the single custom HTTP server from handling *any* further request, so the
-  webhook POST that drives the test hangs forever. A prod build has no HMR and
-  serves fine. The `webServer.command` is therefore `next build && tsx server.ts`
-  (first run pays the ~15s build; `reuseExistingServer` skips it locally on
-  re-runs).
+- **It builds and runs a *production* server, not `dev`.** The
+  `webServer.command` is `next build && tsx server.ts` (first run pays the ~15s
+  build; `reuseExistingServer` skips it locally on re-runs), so the test runs
+  the same code path as the truck.
+
+  History: `dev` used to wedge with the KDS open (webhook POSTs hung) and once
+  forked node processes until macOS hit its per-user process limit. Since
+  `server.ts` gained graceful shutdown (it releases the port, Socket.IO, Redis
+  and Postgres on SIGTERM so `tsx watch` restarts don't stack servers), neither
+  reproduces: re-checked 2026-10-03 with Chrome on `/kds`, `[HMR] connected`,
+  live hot reload, `tsx watch` restarts, and three signed webhooks (all 200,
+  tickets rendered live) — process count flat at 2–3. If it ever recurs, watch
+  `ps -ax | grep -c node` and stop `pnpm dev` before the box runs out of
+  processes.
 
 - **Point it at the right DB/Redis if 5432/6379 are taken.** The config defaults
   to the standard localhost ports, but `infra/docker-compose.yml` publishes
