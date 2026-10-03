@@ -27,6 +27,17 @@ export function orderNumber(squareOrderId: string | null, id: string): string {
   return `#${src.slice(-4).toUpperCase()}`;
 }
 
+/** Short date + time in the given timezone, e.g. "Oct 3, 1:07 PM". */
+export function dateTime(iso: string, timeZone = 'America/Chicago'): string {
+  return new Date(iso).toLocaleString('en-US', {
+    month: 'short',
+    day: 'numeric',
+    hour: 'numeric',
+    minute: '2-digit',
+    timeZone,
+  });
+}
+
 /** Wall-clock time in the given timezone, e.g. "1:07 PM". */
 export function clockTime(iso: string, timeZone = 'America/Chicago'): string {
   return new Date(iso).toLocaleTimeString('en-US', {

@@ -7,7 +7,7 @@ import { businesses, orders } from '@/lib/db/schema';
 // business's timezone (businesses.timezone, default America/Chicago).
 
 /** The single business's timezone (MVP is one business). */
-async function businessTimezone(): Promise<string> {
+export async function businessTimezone(): Promise<string> {
   const [row] = await db
     .select({ tz: businesses.timezone })
     .from(businesses)
