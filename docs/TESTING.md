@@ -107,6 +107,14 @@ live, migrated + seeded Postgres and Redis.
   `ps -ax | grep -c node` and stop `pnpm dev` before the box runs out of
   processes.
 
+  Separately, Turbopack's persistent dev cache (`.next/dev/cache`) made the
+  dev server's memory climb ~30 MB/s while idle after the first compile, until
+  "JavaScript heap out of memory" (~6 min; vercel/next.js#94915, Next 16.2.x).
+  Webpack dev and a fresh cache stayed flat, so `next.config.ts` turns the
+  cache off (`experimental.turbopackFileSystemCacheForDev: false`). Verified:
+  all six pages compiled, then RSS flat at ~1.8 GB for 4 min. If memory climbs
+  again, `rm -rf apps/web/.next/dev` and check that flag.
+
 - **Point it at the right DB/Redis if 5432/6379 are taken.** The config defaults
   to the standard localhost ports, but `infra/docker-compose.yml` publishes
   Postgres/Redis on *ephemeral* host ports (no fixed host mapping), and another
