@@ -264,13 +264,17 @@ export const webhookEvents = pgTable(
 // load-bearing (the adapter reads by JS key); DB column names may be snake_case.
 // We keep the project's uuid/v7 PK convention — the adapter accepts PgUUID ids.
 // `mode: 'date'` is required on token/expiry columns (the adapter passes Dates).
-// Magic-link (Nodemailer) sign-in uses the database session strategy.
+// Sign-in is email + password (Credentials provider, JWT sessions). `passwordHash`
+// holds a scrypt digest (see lib/auth/password.ts); the accounts/sessions/
+// verificationTokens tables below are legacy adapter tables, unused by the
+// credentials flow but kept so existing migrations stay valid.
 export const users = pgTable('users', {
   id: id(),
   name: text('name'),
   email: text('email').unique(),
   emailVerified: timestamp('email_verified', { withTimezone: true, mode: 'date' }),
   image: text('image'),
+  passwordHash: text('password_hash'),
 });
 
 export const accounts = pgTable(

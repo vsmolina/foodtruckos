@@ -1,58 +1,48 @@
-import NextAuth, { type NextAuthConfig } from 'next-auth';
-import Nodemailer from 'next-auth/providers/nodemailer';
-
-// next-auth beta's NodemailerConfig return type doesn't satisfy the provider
-// union under our `exactOptionalPropertyTypes: true` (an internal
-// sendVerificationRequest/server optionality quirk, not our config). The config
-// object below is still fully type-checked by the Nodemailer() call; we only
-// assert the return to the array's element type.
-type Provider = NonNullable<NextAuthConfig['providers']>[number];
-import { DrizzleAdapter } from '@auth/drizzle-adapter';
+import NextAuth from 'next-auth';
+import Credentials from 'next-auth/providers/credentials';
+import { eq } from 'drizzle-orm';
 import { db } from '@/lib/db/client';
-import { users, accounts, sessions, verificationTokens } from '@/lib/db/schema';
+import { users } from '@/lib/db/schema';
+import { verifyPassword } from '@/lib/auth/password';
 
-// Auth.js v5. Single-admin magic-link login for Victor's dashboard.
+// Auth.js v5. Single-admin email + password login for Victor's dashboard.
 //
-// The Nodemailer (email) provider requires the database adapter — it persists
-// verification tokens and, on success, a user + session row. Session strategy is
-// therefore `database` (the default with an adapter). The session cookie holds an
-// opaque token; `proxy.ts` can only check its *presence*, so the real gate is
-// `await auth()` in the (dashboard) layout.
+// The Credentials provider requires the JWT session strategy (it cannot use a
+// database adapter for sessions), so there is no adapter here — `authorize()`
+// does its own lookup against the `users` table. `proxy.ts` still gates the
+// dashboard optimistically on the presence of the `authjs.session-token`
+// cookie; the authoritative check is `await auth()` in the (dashboard) layout.
 //
 // `trustHost` is required off-Vercel (we run on the truck LAN). `AUTH_SECRET`
-// is read from the environment automatically.
+// signs the JWT and is read from the environment automatically.
 const ADMIN_EMAIL = process.env.INITIAL_ADMIN_EMAIL?.toLowerCase();
 
 export const { handlers, auth, signIn, signOut } = NextAuth({
-  adapter: DrizzleAdapter(db, {
-    usersTable: users,
-    accountsTable: accounts,
-    sessionsTable: sessions,
-    verificationTokensTable: verificationTokens,
-  }),
-  session: { strategy: 'database' },
+  session: { strategy: 'jwt' },
   trustHost: true,
   pages: { signIn: '/login' },
   providers: [
-    Nodemailer({
-      // Gmail SMTP over implicit TLS. Use a Google *App Password*, never the
-      // account password (see docs/TESTING.md / .env.example).
-      server: {
-        host: process.env.SMTP_HOST ?? 'smtp.gmail.com',
-        port: Number(process.env.SMTP_PORT ?? 465),
-        secure: true,
-        auth: { user: process.env.SMTP_USER ?? '', pass: process.env.SMTP_PASSWORD ?? '' },
+    Credentials({
+      credentials: {
+        email: { label: 'Email', type: 'email' },
+        password: { label: 'Password', type: 'password' },
       },
-      from: process.env.EMAIL_FROM ?? process.env.SMTP_USER ?? '',
-    }) as Provider,
+      // Return a user object to sign in, or null to reject. Only the one
+      // configured admin may sign in, and only with a matching password.
+      authorize: async (credentials) => {
+        const email = typeof credentials?.email === 'string' ? credentials.email.toLowerCase() : '';
+        const password = typeof credentials?.password === 'string' ? credentials.password : '';
+        if (!email || !password) return null;
+        if (!ADMIN_EMAIL || email !== ADMIN_EMAIL) return null;
+
+        const [user] = await db.select().from(users).where(eq(users.email, email)).limit(1);
+        if (!user?.passwordHash) return null;
+
+        const ok = await verifyPassword(password, user.passwordHash);
+        if (!ok) return null;
+
+        return { id: user.id, email: user.email, name: user.name };
+      },
+    }),
   ],
-  callbacks: {
-    // Only the one configured admin may sign in. The email provider identifies
-    // the user by `user.email`; reject everyone else even if they somehow get a
-    // valid magic link for another address.
-    signIn({ user }) {
-      const email = user.email?.toLowerCase();
-      return Boolean(email && ADMIN_EMAIL && email === ADMIN_EMAIL);
-    },
-  },
 });

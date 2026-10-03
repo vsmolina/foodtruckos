@@ -15,6 +15,13 @@
       "when": 1784322274424,
       "tag": "0001_smooth_norrin_radd",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1791041792075,
+      "tag": "0002_white_toad_men",
+      "breakpoints": true
     }
   ]
 }
