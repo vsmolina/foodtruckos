@@ -34,7 +34,8 @@ async function main(): Promise<void> {
 
   const [store] = await db
     .insert(stores)
-    .values({ businessId: business.id, name: 'San Marcos' })
+    // Map the truck's Square location so webhook ingest matches it directly.
+    .values({ businessId: business.id, name: 'San Marcos', squareLocationId: process.env.SQUARE_LOCATION_ID || null })
     .returning();
   if (!store) throw new Error('failed to insert store');
 

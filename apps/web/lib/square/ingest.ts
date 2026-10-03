@@ -1,4 +1,4 @@
-import { eq, inArray } from 'drizzle-orm';
+import { eq, inArray, sql } from 'drizzle-orm';
 import type * as Square from 'square';
 import { db } from '@/lib/db/client';
 import {
@@ -85,6 +85,11 @@ export async function upsertOrder(sqOrder: Square.Order): Promise<void> {
   const subtotalCents = Math.max(0, totalCents - taxCents - tipCents);
 
   const event = await db.transaction(async (tx): Promise<TicketEvent | null> => {
+    // Square fires order.created and order.updated near-simultaneously. Serialize
+    // per order so the second event sees the first's row (and the version guard)
+    // instead of racing it into a unique-violation on square_order_id.
+    await tx.execute(sql`select pg_advisory_xact_lock(hashtext(${squareOrderId}))`);
+
     const existing = await tx
       .select()
       .from(orders)
@@ -227,6 +232,7 @@ export type RawPayment = {
   amount_money?: RawMoney | null;
   tip_money?: RawMoney | null;
   status?: string | null;
+  version?: number | null;
   card_details?: { card?: { card_brand?: string | null } | null } | null;
 };
 
@@ -255,8 +261,18 @@ export async function ingestPayment(payment: RawPayment): Promise<void> {
     rawPayload: toJsonSafe(payment),
   };
 
+  // Square doesn't deliver webhooks in order: payment.created (v1, APPROVED) can
+  // land after payment.updated (v2+, COMPLETED). Only overwrite with a newer
+  // version; the stored version lives in raw_payload.
+  const version = payment.version;
   await db
     .insert(payments)
     .values(values)
-    .onConflictDoUpdate({ target: payments.squarePaymentId, set: values });
+    .onConflictDoUpdate({
+      target: payments.squarePaymentId,
+      set: values,
+      ...(version != null && {
+        setWhere: sql`coalesce((${payments.rawPayload}->>'version')::int, -1) < ${version}`,
+      }),
+    });
 }
