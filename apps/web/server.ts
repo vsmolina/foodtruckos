@@ -9,6 +9,7 @@ import { subscribe } from '@/lib/realtime/channel';
 import { getActiveTickets } from '@/lib/kds/snapshot';
 import { SOCKET, type KdsEvent } from '@/lib/kds/types';
 import { logger } from '@/lib/logger';
+import { closeSquareSyncQueue, startSquareSyncWorker, syncEnabled } from '@/lib/queue/square-sync';
 
 /**
  * Custom server: Next.js request handler + Socket.IO on one HTTP server.
@@ -69,7 +70,12 @@ app.prepare().then(async () => {
     });
   });
 
-  httpServer.listen(port, () => logger.info({ port, dev }, 'server (next + socket.io) listening'));
+  // Menu → Square Catalog sync worker (Phase 5); off in mock mode / without credentials.
+  const syncWorker = syncEnabled() ? startSquareSyncWorker() : null;
+
+  httpServer.listen(port, () =>
+    logger.info({ port, dev, squareSync: Boolean(syncWorker) }, 'server (next + socket.io) listening'),
+  );
 
   // Graceful shutdown. `tsx watch` (dev) and the container runtime (prod) both
   // stop us with SIGTERM/SIGINT. We must release the listening socket and every
@@ -99,6 +105,8 @@ app.prepare().then(async () => {
       await Promise.allSettled([
         unsubscribe(),
         app.close(),
+        syncWorker?.close(),
+        closeSquareSyncQueue(),
         redis.quit(),
         sql.end({ timeout: 5 }),
       ]);

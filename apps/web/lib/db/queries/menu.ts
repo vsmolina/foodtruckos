@@ -20,6 +20,12 @@ export async function getStoreId(): Promise<string | null> {
   return row?.id ?? null;
 }
 
+/** When the Square catalog was last pulled into our menu (null = never). */
+export async function getCatalogPulledAt(): Promise<Date | null> {
+  const [row] = await db.select({ at: stores.catalogPulledAt }).from(stores).limit(1);
+  return row?.at ?? null;
+}
+
 /** Every category in display order, with its items (by name) and their variations. */
 export async function getMenu(): Promise<MenuCategory[]> {
   const storeId = await getStoreId();

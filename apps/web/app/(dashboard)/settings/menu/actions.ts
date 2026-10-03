@@ -7,6 +7,15 @@ import { db } from '@/lib/db/client';
 import { getStoreId, isUuid } from '@/lib/db/queries/menu';
 import { menuCategories, menuItemVariations, menuItems, menuModifiers, orderItems } from '@/lib/db/schema';
 import { parseDollars } from '@/lib/format';
+import { logger } from '@/lib/logger';
+import {
+  enqueueAllUnsynced,
+  enqueueCategorySync,
+  enqueueDelete,
+  enqueueItemSync,
+  syncEnabled,
+} from '@/lib/queue/square-sync';
+import { pullCatalog, PullRequiredError, squareErrorMessage } from '@/lib/square/menu';
 import type { Notice } from './notices';
 
 // Menu CRUD (our DB only in the MVP; Square Catalog stays the source of truth
@@ -17,6 +26,15 @@ import type { Notice } from './notices';
 const MENU = '/settings/menu';
 const itemPath = (id: string) => `${MENU}/items/${id}`;
 const go = (path: string, notice: Notice): never => redirect(`${path}?notice=${notice}`);
+
+/** Queueing a Square sync is best-effort: a Redis hiccup must never fail a save. */
+async function queueSafely(what: string, fn: () => Promise<unknown>): Promise<void> {
+  try {
+    await fn();
+  } catch (err) {
+    logger.error({ what, err: err instanceof Error ? err.message : String(err) }, 'could not queue square sync');
+  }
+}
 
 async function requireAdmin(): Promise<void> {
   const session = await auth();
@@ -61,7 +79,11 @@ export async function createCategory(fd: FormData): Promise<void> {
     .select({ n: max(menuCategories.sortOrder) })
     .from(menuCategories)
     .where(eq(menuCategories.storeId, storeId!));
-  await db.insert(menuCategories).values({ storeId: storeId!, name, sortOrder: (last?.n ?? -1) + 1 });
+  const [row] = await db
+    .insert(menuCategories)
+    .values({ storeId: storeId!, name, sortOrder: (last?.n ?? -1) + 1 })
+    .returning({ id: menuCategories.id });
+  await queueSafely('category', () => enqueueCategorySync(row!.id));
   go(MENU, 'created');
 }
 
@@ -71,6 +93,7 @@ export async function renameCategory(id: string, fd: FormData): Promise<void> {
   if (!name) go(MENU, 'err_name');
   if (!(await categoryInStore(id))) go(MENU, 'err_not_found');
   await db.update(menuCategories).set({ name }).where(eq(menuCategories.id, id));
+  await queueSafely('category', () => enqueueCategorySync(id));
   go(MENU, 'saved');
 }
 
@@ -103,7 +126,8 @@ export async function deleteCategory(id: string): Promise<void> {
   if (!(await categoryInStore(id))) go(MENU, 'err_not_found');
   const [items] = await db.select({ n: count() }).from(menuItems).where(eq(menuItems.categoryId, id));
   if ((items?.n ?? 0) > 0) go(MENU, 'err_not_empty');
-  await db.delete(menuCategories).where(eq(menuCategories.id, id));
+  const [gone] = await db.delete(menuCategories).where(eq(menuCategories.id, id)).returning({ squareId: menuCategories.squareId });
+  if (gone?.squareId) await queueSafely('delete', () => enqueueDelete([gone.squareId!]));
   go(MENU, 'deleted');
 }
 
@@ -127,6 +151,7 @@ export async function createItem(fd: FormData): Promise<void> {
     await tx.insert(menuItemVariations).values({ itemId: item!.id, name: 'Regular', priceCents, isDefault: true });
     return item!.id;
   });
+  await queueSafely('item', () => enqueueItemSync(id));
   go(itemPath(id), 'created');
 }
 
@@ -148,6 +173,7 @@ export async function updateItem(id: string, fd: FormData): Promise<void> {
       isAvailable: fd.get('isAvailable') === 'on',
     })
     .where(eq(menuItems.id, id));
+  await queueSafely('item', () => enqueueItemSync(id));
   go(itemPath(id), 'saved');
 }
 
@@ -158,11 +184,21 @@ export async function deleteItem(id: string): Promise<void> {
   const [used] = await db.select({ n: count() }).from(orderItems).where(eq(orderItems.menuItemId, id));
   if ((used?.n ?? 0) > 0) go(itemPath(id), 'err_in_use');
 
-  await db.transaction(async (tx) => {
-    await tx.delete(menuModifiers).where(eq(menuModifiers.itemId, id));
+  // Square ids to remove once the rows are gone (an ITEM delete takes its
+  // variations with it; its modifier lists are deleted if nothing else uses them).
+  const square = await db.transaction(async (tx) => {
+    const mods = await tx
+      .delete(menuModifiers)
+      .where(eq(menuModifiers.itemId, id))
+      .returning({ listId: menuModifiers.squareModifierListId });
     await tx.delete(menuItemVariations).where(eq(menuItemVariations.itemId, id));
-    await tx.delete(menuItems).where(eq(menuItems.id, id));
+    const [item] = await tx.delete(menuItems).where(eq(menuItems.id, id)).returning({ squareId: menuItems.squareId });
+    return {
+      itemIds: item?.squareId ? [item.squareId] : [],
+      listIds: [...new Set(mods.map((m) => m.listId).filter((x): x is string => !!x))],
+    };
   });
+  await queueSafely('delete', () => enqueueDelete(square.itemIds, square.listIds));
   go(MENU, 'deleted');
 }
 
@@ -192,6 +228,7 @@ export async function addVariation(itemId: string, fd: FormData): Promise<void> 
   await db
     .insert(menuItemVariations)
     .values({ itemId, name, priceCents: priceCents!, isDefault: (existing?.n ?? 0) === 0 });
+  await queueSafely('item', () => enqueueItemSync(itemId));
   go(itemPath(itemId), 'saved');
 }
 
@@ -204,6 +241,7 @@ export async function updateVariation(id: string, fd: FormData): Promise<void> {
   const priceCents = price(fd, 'price');
   if (priceCents == null) go(itemPath(itemId!), 'err_price');
   await db.update(menuItemVariations).set({ name, priceCents: priceCents! }).where(eq(menuItemVariations.id, id));
+  await queueSafely('item', () => enqueueItemSync(itemId!));
   go(itemPath(itemId!), 'saved');
 }
 
@@ -218,6 +256,7 @@ export async function setDefaultVariation(id: string): Promise<void> {
       .where(and(eq(menuItemVariations.itemId, itemId!), ne(menuItemVariations.id, id)));
     await tx.update(menuItemVariations).set({ isDefault: true }).where(eq(menuItemVariations.id, id));
   });
+  await queueSafely('item', () => enqueueItemSync(itemId!));
   go(itemPath(itemId!), 'saved');
 }
 
@@ -241,6 +280,7 @@ export async function deleteVariation(id: string): Promise<void> {
     }
     return false;
   });
+  if (!blocked) await queueSafely('item', () => enqueueItemSync(itemId!));
   go(itemPath(itemId!), blocked ? 'err_last_variation' : 'deleted');
 }
 
@@ -262,6 +302,7 @@ export async function addModifier(itemId: string, fd: FormData): Promise<void> {
   await db
     .insert(menuModifiers)
     .values({ itemId, name, priceCentsDelta: delta!, isRequired: fd.get('isRequired') === 'on' });
+  await queueSafely('item', () => enqueueItemSync(itemId));
   go(itemPath(itemId), 'saved');
 }
 
@@ -277,6 +318,7 @@ export async function updateModifier(id: string, fd: FormData): Promise<void> {
     .update(menuModifiers)
     .set({ name, priceCentsDelta: delta!, isRequired: fd.get('isRequired') === 'on' })
     .where(eq(menuModifiers.id, id));
+  await queueSafely('item', () => enqueueItemSync(itemId!));
   go(itemPath(itemId!), 'saved');
 }
 
@@ -285,5 +327,37 @@ export async function deleteModifier(id: string): Promise<void> {
   const itemId = await modifierItemId(id);
   if (!itemId) go(MENU, 'err_not_found');
   await db.delete(menuModifiers).where(eq(menuModifiers.id, id));
+  await queueSafely('item', () => enqueueItemSync(itemId!));
   go(itemPath(itemId!), 'deleted');
+}
+
+// --- Square sync controls ----------------------------------------------------------
+
+/** Re-queue one item's push (the "Retry" on an error badge). */
+export async function retryItemSync(id: string): Promise<void> {
+  await requireAdmin();
+  if (!isUuid(id)) go(MENU, 'err_not_found');
+  await queueSafely('item', () => enqueueItemSync(id));
+  go(itemPath(id), 'sync_queued');
+}
+
+/** Queue every item/category that isn't synced yet — the initial push, or after errors. */
+export async function pushAllToSquare(): Promise<void> {
+  await requireAdmin();
+  if (!syncEnabled()) go(MENU, 'err_sync_off');
+  await queueSafely('all', () => enqueueAllUnsynced());
+  go(MENU, 'sync_queued');
+}
+
+/** One-time import of the Square catalog (edits made on the POS / dashboard). */
+export async function pullFromSquare(): Promise<void> {
+  await requireAdmin();
+  if (!syncEnabled()) go(MENU, 'err_sync_off');
+  try {
+    await pullCatalog();
+  } catch (err) {
+    logger.error({ err: squareErrorMessage(err) }, 'square pull failed');
+    go(MENU, err instanceof PullRequiredError ? 'err_pull_required' : 'err_pull');
+  }
+  go(MENU, 'pulled');
 }

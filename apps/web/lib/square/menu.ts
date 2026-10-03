@@ -240,7 +240,7 @@ export async function pushItem(itemId: string): Promise<void> {
 }
 
 /** Delete modifier lists no local modifier references any more. */
-async function deleteUnusedLists(listIds: string[]): Promise<void> {
+export async function deleteUnusedLists(listIds: string[]): Promise<void> {
   const stillUsed = await db
     .selectDistinct({ id: menuModifiers.squareModifierListId })
     .from(menuModifiers)

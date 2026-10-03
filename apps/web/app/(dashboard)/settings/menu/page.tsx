@@ -1,8 +1,18 @@
 import Link from 'next/link';
-import { getMenu, type MenuCategory } from '@/lib/db/queries/menu';
+import { getCatalogPulledAt, getMenu, type MenuCategory } from '@/lib/db/queries/menu';
 import { DeleteConfirm, inputClass, NoticeBanner, PrimaryButton, QuietButton } from '@/components/dashboard/form';
-import { money } from '@/lib/format';
-import { createCategory, deleteCategory, moveCategory, renameCategory } from './actions';
+import { RefreshWhilePending } from '@/components/dashboard/RefreshWhilePending';
+import { SyncBadge } from '@/components/dashboard/SyncBadge';
+import { dateTime, money } from '@/lib/format';
+import { syncEnabled } from '@/lib/queue/square-sync';
+import {
+  createCategory,
+  deleteCategory,
+  moveCategory,
+  pullFromSquare,
+  pushAllToSquare,
+  renameCategory,
+} from './actions';
 import { noticeFor } from './notices';
 
 export const dynamic = 'force-dynamic';
@@ -19,10 +29,12 @@ function CategorySection({
   category,
   isFirst,
   isLast,
+  showSync,
 }: {
   category: MenuCategory;
   isFirst: boolean;
   isLast: boolean;
+  showSync: boolean;
 }): React.JSX.Element {
   return (
     <section className="rounded-[var(--radius-lg)] border border-[var(--rule)] bg-bg-raised">
@@ -38,6 +50,7 @@ function CategorySection({
           />
           <QuietButton>Rename</QuietButton>
         </form>
+        {showSync ? <SyncBadge status={category.syncStatus} error={category.syncError} /> : null}
         <div className="flex items-center">
           {!isFirst ? (
             <form action={moveCategory.bind(null, category.id, 'up')}>
@@ -83,6 +96,11 @@ function CategorySection({
                     ? `${item.modifierCount} modifier${item.modifierCount === 1 ? '' : 's'}`
                     : null}
                 </td>
+                {showSync ? (
+                  <td className="px-4 py-2.5 text-right">
+                    <SyncBadge status={item.syncStatus} error={item.syncError} />
+                  </td>
+                ) : null}
                 <td className="px-4 py-2.5 text-right font-mono tabular-nums text-ink">
                   {priceRange(item.variations)}
                 </td>
@@ -109,21 +127,55 @@ export default async function MenuSettingsPage({
 }: {
   searchParams: Promise<{ [key: string]: string | string[] | undefined }>;
 }): Promise<React.JSX.Element> {
-  const [menu, sp] = await Promise.all([getMenu(), searchParams]);
+  const [menu, pulledAt, sp] = await Promise.all([getMenu(), getCatalogPulledAt(), searchParams]);
+  const sync = syncEnabled();
+  const all = [...menu, ...menu.flatMap((c) => c.items)];
+  const pending = all.some((x) => x.syncStatus === 'pending');
+  const unsynced = all.filter((x) => x.syncStatus === 'local' || x.syncStatus === 'error').length;
 
   return (
     <div className="mx-auto max-w-3xl">
       <h1 className="font-display text-2xl text-ink">Menu</h1>
-      <p className="mt-1 max-w-xl text-sm text-ink-3">
-        Edits here change this app’s menu only. Square’s catalog isn’t updated yet — two-way sync comes in a
-        later phase.
-      </p>
+      {sync ? (
+        <>
+          <p className="mt-1 max-w-xl text-sm text-ink-3">
+            Saving sends the change to Square, and the POS picks it up within seconds. Edited something on the
+            POS or in the Square dashboard? Pull from Square first — the last save wins.
+          </p>
+          <div className="mt-3 flex flex-wrap items-center gap-3">
+            <form action={pullFromSquare}>
+              <PrimaryButton>Pull from Square</PrimaryButton>
+            </form>
+            {unsynced > 0 ? (
+              <form action={pushAllToSquare}>
+                <QuietButton>
+                  Send {unsynced} unsynced {unsynced === 1 ? 'change' : 'changes'} to Square
+                </QuietButton>
+              </form>
+            ) : null}
+            <span className="text-xs text-ink-3">
+              {pulledAt ? `Last pulled ${dateTime(pulledAt)}` : 'Never pulled from Square'}
+            </span>
+          </div>
+        </>
+      ) : (
+        <p className="mt-1 max-w-xl text-sm text-ink-3">
+          Square sync is off (mock mode or no Square credentials) — edits change this app’s menu only.
+        </p>
+      )}
       <NoticeBanner notice={noticeFor(sp.notice)} />
+      <RefreshWhilePending active={pending} />
 
       <div className="mt-6 flex flex-col gap-5">
         {menu.length === 0 ? <p className="text-sm text-ink-3">No categories yet. Add one below.</p> : null}
         {menu.map((c, i) => (
-          <CategorySection key={c.id} category={c} isFirst={i === 0} isLast={i === menu.length - 1} />
+          <CategorySection
+            key={c.id}
+            category={c}
+            isFirst={i === 0}
+            isLast={i === menu.length - 1}
+            showSync={sync}
+          />
         ))}
       </div>
 

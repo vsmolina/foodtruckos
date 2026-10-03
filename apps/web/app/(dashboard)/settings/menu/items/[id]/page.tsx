@@ -9,13 +9,17 @@ import {
   PrimaryButton,
   QuietButton,
 } from '@/components/dashboard/form';
+import { RefreshWhilePending } from '@/components/dashboard/RefreshWhilePending';
+import { SyncBadge } from '@/components/dashboard/SyncBadge';
 import { dollarsInput } from '@/lib/format';
+import { syncEnabled } from '@/lib/queue/square-sync';
 import {
   addModifier,
   addVariation,
   deleteItem,
   deleteModifier,
   deleteVariation,
+  retryItemSync,
   setDefaultVariation,
   updateItem,
   updateModifier,
@@ -54,8 +58,20 @@ export default async function EditMenuItemPage({
       <Link href="/settings/menu" className="text-sm text-ink-2 hover:text-ink">
         ← Menu
       </Link>
-      <h1 className="mt-2 font-display text-2xl text-ink">{item.name}</h1>
+      <div className="mt-2 flex flex-wrap items-baseline gap-3">
+        <h1 className="font-display text-2xl text-ink">{item.name}</h1>
+        {syncEnabled() ? <SyncBadge status={item.syncStatus} error={item.syncError} /> : null}
+      </div>
+      {syncEnabled() && item.syncStatus === 'error' ? (
+        <div className="mt-2 flex max-w-[640px] items-start justify-between gap-4 border-l-2 border-[var(--danger)] px-3 py-1.5 text-sm">
+          <span className="text-danger">Square rejected the last change: {item.syncError ?? 'unknown error'}</span>
+          <form action={retryItemSync.bind(null, item.id)}>
+            <QuietButton>Retry</QuietButton>
+          </form>
+        </div>
+      ) : null}
       <NoticeBanner notice={noticeFor(sp.notice)} />
+      <RefreshWhilePending active={item.syncStatus === 'pending'} />
 
       {/* Details */}
       <form action={updateItem.bind(null, item.id)} className="mt-6 flex max-w-[640px] flex-col gap-5">
