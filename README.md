@@ -20,6 +20,8 @@ Everything except the KDS needs the admin login. Phases 1–5 of
 [`docs/02-BUILD-SPEC.md`](docs/02-BUILD-SPEC.md) are built; ideas beyond that live in
 [`docs/BACKLOG.md`](docs/BACKLOG.md).
 
+> **Paused.** Where things stand and what to do next: [`docs/STATUS.md`](docs/STATUS.md).
+
 ---
 
 ## Quick start (Mac, development)
