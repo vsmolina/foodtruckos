@@ -55,7 +55,7 @@ story copy, real hours/partners, Stripe/Twilio/Resend/Neon/Vercel accounts, lega
 review. Local: `pnpm --filter site dev` → http://localhost:3020 (admin password
 in `apps/site/.env` comment).
 
-### 2026-10-13 — dashboard **Website** tabs — UNCOMMITTED
+### 2026-10-13 — dashboard **Website** tabs — committed on `feat/customer-site` (c0ba366)
 
 The dashboard (`apps/web`) now has a Website section (`/website/*`) with tabs:
 Status, Menu extras, Specials, Merch (create products with photos/variants,
@@ -70,6 +70,25 @@ the site to re-sync its menu (debounced 5 s). The dashboard shell is now
 responsive (top nav on phones). Verified: both apps typecheck, lint and build;
 every tab driven end to end in a browser at 1280 and 390 px. Not yet tested:
 the Docker image build (Dockerfile now copies the contract package manifest).
+
+### 2026-10-13 — Instagram posts on the gallery page — committed on `feat/customer-site`
+
+`/gallery` shows the owner's 3 latest Instagram posts as Instagram embeds.
+Connect once (paste a token) in the dashboard (Website → Gallery) or the site's
+`/admin/gallery`; steps are in `apps/site/README.md` → "Instagram posts on the
+gallery page".
+- Code: `apps/site/lib/instagram.ts`, migration `0001_instagram`, new ops
+  `gallery.instagram*`.
+- The token renews weekly. Only post ids and links are stored. Refreshes run
+  after views and from a daily cron (`vercel.json`, needs `CRON_SECRET`).
+- **oEmbed:** the Meta app id and client token are in the local
+  `apps/site/.env`, and must also be set in Vercel. Meta answers "(#10) must be
+  reviewed": submit **Meta oEmbed Read** for App Review. Until then the
+  standard embed code is used, and the site switches over automatically.
+- The `INSTAGRAM_EMBED_POST_URLS` setting was replaced by this.
+- Verified: a local mock of the Instagram API, plus a real public post
+  rendering through Instagram's embed.js at 390 and 1280 px.
+- **Not yet tried with the owner's real account**: needs the account token.
 
 ## Where the code is
 

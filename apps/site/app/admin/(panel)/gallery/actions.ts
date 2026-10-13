@@ -1,6 +1,7 @@
 'use server';
 
 import * as gallery from '@/lib/admin/gallery';
+import * as instagram from '@/lib/admin/instagram';
 import { requireAdmin } from '@/lib/auth';
 
 // Thin wrappers: the logic lives in lib/admin/gallery.ts, shared with the
@@ -68,4 +69,25 @@ export async function resolveTakedown(form: FormData): Promise<void> {
 export async function dismissTakedown(form: FormData): Promise<void> {
   await requireAdmin();
   await gallery.dismissTakedown({ id: idOf(form) });
+}
+
+export type InstagramState = { ok?: string; error?: string };
+
+export async function connectInstagram(_prev: InstagramState, form: FormData): Promise<InstagramState> {
+  await requireAdmin();
+  const r = await instagram.connectInstagram({ accessToken: String(form.get('accessToken') ?? '') });
+  if (!r.ok) return { error: r.fieldErrors?.accessToken ?? r.error };
+  if (r.data.connected && r.data.lastError) return { error: `Connected as @${r.data.username}, but: ${r.data.lastError}` };
+  return { ok: 'Connected. Your latest posts are on the gallery page.' };
+}
+
+export async function refreshInstagram(): Promise<InstagramState> {
+  await requireAdmin();
+  const r = await instagram.refreshInstagram();
+  return r.ok ? { ok: 'Up to date.' } : { error: r.error };
+}
+
+export async function disconnectInstagram(): Promise<void> {
+  await requireAdmin();
+  await instagram.disconnectInstagram();
 }

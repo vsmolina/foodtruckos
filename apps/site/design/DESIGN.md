@@ -183,7 +183,8 @@ photos and no AI imagery.
    - The grain is one inline SVG.
    - Doodles are inline SVG with no requests.
    - The map iframe is `loading="lazy"`.
-   - YouTube and Instagram load only on tap.
+   - YouTube loads only on tap. Instagram's embed script loads only when the
+     gallery's Instagram section comes near the screen.
    - Images use `next/image` with `sizes`.
    - No animation runs layout properties, only transform, opacity and box-shadow.
 6. **Accessibility.**

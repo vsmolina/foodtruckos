@@ -54,6 +54,11 @@ export function dateTime(iso: string | Date, timeZone = 'America/Chicago'): stri
   });
 }
 
+/** Date only in the given timezone, e.g. "Oct 3, 2026". */
+export function shortDate(iso: string | Date, timeZone = 'America/Chicago'): string {
+  return new Date(iso).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric', timeZone });
+}
+
 /** Wall-clock time in the given timezone, e.g. "1:07 PM". */
 export function clockTime(iso: string, timeZone = 'America/Chicago'): string {
   return new Date(iso).toLocaleTimeString('en-US', {

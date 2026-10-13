@@ -38,7 +38,7 @@ export default function PrivacyPage() {
         </li>
         <li>
           <strong>Analytics:</strong> we count page views by page and referring website. We don’t use analytics cookies, don’t store IP
-          addresses, and don’t use third-party trackers. To limit abuse we keep a short-lived, one-way hash of your connection with form
+          addresses, and don’t use third-party trackers (Instagram’s embed on the gallery page is covered under Cookies). To limit abuse we keep a short-lived, one-way hash of your connection with form
           submissions for rate limiting.
         </li>
       </ul>
@@ -54,6 +54,14 @@ export default function PrivacyPage() {
         </li>
         <li>Your cart is kept in your browser’s local storage on your device.</li>
         <li>The admin area uses a sign-in cookie for the owner only.</li>
+        <li>
+          The gallery page shows our latest Instagram posts using Instagram’s embed. When those load, Instagram (Meta) may collect data
+          and set cookies under{' '}
+          <a href="https://privacycenter.instagram.com/policy" rel="noopener">
+            Instagram’s privacy policy
+          </a>
+          . That is the only page where this happens.
+        </li>
       </ul>
 
       <h2>Who we share it with</h2>

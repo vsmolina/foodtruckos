@@ -7,16 +7,19 @@ import { requireAdmin } from '@/lib/auth';
 import { cx } from '@/lib/cx';
 import { db } from '@/lib/db/client';
 import { galleryPhotos, takedownRequests } from '@/lib/db/schema';
-import { dateTime } from '@/lib/format';
+import { instagramStatus } from '@/lib/admin/instagram';
+import { dateTime, shortDate } from '@/lib/format';
 import {
   approvePhoto,
   confirmConsent,
+  disconnectInstagram,
   dismissTakedown,
   rejectPhoto,
   removePhoto,
   resolveTakedown,
   restoreToPending,
 } from './actions';
+import { ConnectInstagram, RefreshInstagram } from './InstagramForms';
 import { OwnerUpload } from './OwnerUpload';
 
 export const dynamic = 'force-dynamic';
@@ -69,7 +72,85 @@ export default async function AdminGalleryPage({ searchParams }: { searchParams:
           <OwnerUpload />
         </Card>
       ) : null}
+
+      <InstagramCard />
     </AdminPage>
+  );
+}
+
+async function InstagramCard() {
+  const ig = await instagramStatus();
+  return (
+    <Card title="Instagram on the gallery page">
+      {ig.connected ? (
+        <div className="flex flex-col gap-3 text-sm">
+          <p>
+            Showing the 3 latest posts from{' '}
+            <a href={`https://instagram.com/${ig.username}`} target="_blank" rel="noopener" className="font-bold underline">
+              @{ig.username}
+            </a>
+            . New posts appear on their own within about 30 minutes.
+          </p>
+          <p className="text-ink-muted">
+            Last checked {ig.lastFetchedAt ? dateTime(ig.lastFetchedAt) : 'never'}
+            {ig.tokenExpiresAt ? ` · token renews itself (current one good until ${shortDate(ig.tokenExpiresAt)})` : ''}
+          </p>
+          {ig.lastError ? <p className="rounded-sm border-2 border-chile p-2 font-bold">{ig.lastError}</p> : null}
+          {ig.posts.length ? (
+            <ul className="flex flex-col gap-1">
+              {ig.posts.map((p) => (
+                <li key={p.id}>
+                  <a href={p.permalink} target="_blank" rel="noopener" className="inline-flex min-h-11 items-center font-bold underline">
+                    {p.mediaType === 'VIDEO' ? 'Reel' : p.mediaType === 'CAROUSEL_ALBUM' ? 'Album' : 'Photo'} · {shortDate(p.postedAt)} ↗
+                  </a>
+                </li>
+              ))}
+            </ul>
+          ) : (
+            <Empty>No posts pulled yet.</Empty>
+          )}
+          <p className="text-ink-muted">
+            {ig.oembed
+              ? 'Shown with Instagram’s official embeds.'
+              : 'Shown with Instagram’s standard embed code. Once Meta approves the app’s “oEmbed Read” review, the site switches to official embeds by itself.'}
+          </p>
+          <div className="flex flex-wrap items-start gap-2">
+            <RefreshInstagram />
+            <form action={disconnectInstagram}>
+              <button type="submit" className={buttonClass('danger', 'sm')}>
+                Disconnect
+              </button>
+            </form>
+          </div>
+          <details>
+            <summary className="cursor-pointer font-bold">Use a new token</summary>
+            <div className="mt-3">
+              <ConnectInstagram reconnect />
+            </div>
+          </details>
+        </div>
+      ) : (
+        <div className="flex flex-col gap-3 text-sm">
+          <p>Connect your Instagram and the gallery page shows your 3 latest posts, each linking to the post.</p>
+          <InstagramSteps />
+          <ConnectInstagram reconnect={false} />
+        </div>
+      )}
+    </Card>
+  );
+}
+
+function InstagramSteps() {
+  return (
+    <ol className="list-decimal space-y-1 pl-5 text-ink-muted">
+      <li>Your Instagram must be a Professional account (Business or Creator: Instagram → Settings → Account type).</li>
+      <li>
+        At <a href="https://developers.facebook.com/apps" target="_blank" rel="noopener" className="underline">developers.facebook.com/apps</a>, create an app and add the
+        <strong> Instagram</strong> product.
+      </li>
+      <li>Under “API setup with Instagram login”, add your account and click <strong>Generate token</strong>.</li>
+      <li>Paste the token here. It renews itself from then on.</li>
+    </ol>
   );
 }
 

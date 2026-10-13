@@ -1,7 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
-import { Button } from '@/components/ui/Button';
+import { useEffect, useRef } from 'react';
 
 declare global {
   interface Window {
@@ -9,46 +8,59 @@ declare global {
   }
 }
 
-// Official Instagram blockquote embeds, loaded only when the visitor asks:
-// no third-party script (or tracking) on page load, and nothing heavy on a
-// weak signal.
-export function InstagramEmbeds({ urls }: { urls: string[] }) {
-  const [load, setLoad] = useState(false);
+export type EmbedPost = { id: string; permalink: string; html: string };
+
+const SCRIPT_ID = 'instagram-embed-js';
+
+// The owner's latest posts as Instagram's own embeds. Instagram's script loads
+// only when the section comes near the screen, so the rest of the page never
+// waits on it. The HTML is Instagram's blockquote (from oEmbed or the standard
+// markup, built on the server); embed.js swaps each one for the rendered post,
+// which is why it goes in via innerHTML: React must not own those nodes.
+export function InstagramEmbeds({ posts }: { posts: EmbedPost[] }) {
+  const ref = useRef<HTMLUListElement>(null);
 
   useEffect(() => {
-    if (!load) return;
-    if (window.instgrm) {
-      window.instgrm.Embeds.process();
-      return;
-    }
-    const s = document.createElement('script');
-    s.src = 'https://www.instagram.com/embed.js';
-    s.async = true;
-    document.body.appendChild(s);
-  }, [load]);
-
-  if (!load) {
-    return (
-      <Button type="button" variant="paper" onClick={() => setLoad(true)}>
-        Load Instagram posts
-      </Button>
+    const el = ref.current;
+    if (!el) return;
+    const load = () => {
+      if (window.instgrm) {
+        window.instgrm.Embeds.process();
+        return;
+      }
+      if (document.getElementById(SCRIPT_ID)) return;
+      const s = document.createElement('script');
+      s.id = SCRIPT_ID;
+      s.src = 'https://www.instagram.com/embed.js';
+      s.async = true;
+      document.body.appendChild(s);
+    };
+    const io = new IntersectionObserver(
+      (entries) => {
+        if (entries.some((e) => e.isIntersecting)) {
+          io.disconnect();
+          load();
+        }
+      },
+      { rootMargin: '600px 0px' },
     );
-  }
+    io.observe(el);
+    return () => io.disconnect();
+  }, []);
+
   return (
-    <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
-      {urls.map((url) => (
-        <blockquote
-          key={url}
-          className="instagram-media"
-          data-instgrm-permalink={url}
-          data-instgrm-version="14"
-          style={{ margin: 0, minWidth: 0, width: '100%', background: 'var(--paper)' }}
-        >
-          <a href={url} rel="noopener">
-            View on Instagram
-          </a>
-        </blockquote>
+    <ul
+      ref={ref}
+      aria-label="Latest Instagram posts"
+      className="-mx-4 flex snap-x snap-mandatory gap-4 overflow-x-auto px-4 pb-4 lg:mx-0 lg:grid lg:grid-cols-3 lg:gap-6 lg:overflow-visible lg:px-0"
+    >
+      {posts.map((p) => (
+        <li
+          key={p.id}
+          className="w-[326px] shrink-0 snap-center overflow-hidden rounded-sm border-[length:var(--line)] border-outline bg-white shadow-hard lg:w-auto [&_.instagram-media]:!m-0 [&_.instagram-media]:!min-w-0 [&_.instagram-media]:!w-full [&_.instagram-media]:!rounded-none [&_.instagram-media]:!border-0 [&_iframe]:!min-w-0 [&_iframe]:!w-full"
+          dangerouslySetInnerHTML={{ __html: p.html }}
+        />
       ))}
-    </div>
+    </ul>
   );
 }

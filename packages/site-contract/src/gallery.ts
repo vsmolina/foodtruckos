@@ -40,6 +40,33 @@ export type GalleryCounts = { pending: number; approved: number; removed: number
 /** removed = removed + rejected. */
 export type GalleryView = 'pending' | 'approved' | 'removed';
 
+/** One of the latest posts from the connected Instagram account (shown as Instagram's own embed). */
+export type InstagramPostDto = {
+  id: string;
+  /** Opens the post on Instagram. */
+  permalink: string;
+  mediaType: 'IMAGE' | 'VIDEO' | 'CAROUSEL_ALBUM';
+  postedAt: IsoDate;
+};
+
+/** The access token itself never leaves the website. */
+export type InstagramStatusDto =
+  | { connected: false }
+  | {
+      connected: true;
+      username: string;
+      connectedAt: IsoDate;
+      /** The token renews itself weekly; this only matters if renewals keep failing. */
+      tokenExpiresAt: IsoDate | null;
+      lastFetchedAt: IsoDate | null;
+      /** Last refresh problem, cleared on the next success. Posts already shown stay up. */
+      lastError: string | null;
+      /** Newest first; the 3 shown on /gallery. */
+      posts: InstagramPostDto[];
+      /** Embeds come from Meta's oEmbed (app approved) rather than the standard embed code. */
+      oembed: boolean;
+    };
+
 type Id = { id: string };
 
 export type GalleryOps = {
@@ -66,4 +93,11 @@ export type GalleryOps = {
   'gallery.resolveTakedown': { input: Id & { photoId?: string }; output: { resolved: true } };
   /** Close without removing anything. */
   'gallery.dismissTakedown': { input: Id; output: { resolved: true } };
+  'gallery.instagram': { input: Empty; output: InstagramStatusDto };
+  /** Checks the token with Instagram, saves it and pulls the latest posts. */
+  'gallery.instagramConnect': { input: { accessToken: string }; output: InstagramStatusDto };
+  /** Pull the latest posts now (normally automatic every 30 min while people visit, plus daily). */
+  'gallery.instagramRefresh': { input: Empty; output: InstagramStatusDto };
+  /** Forget the token and take the posts off the site. */
+  'gallery.instagramDisconnect': { input: Empty; output: InstagramStatusDto };
 };

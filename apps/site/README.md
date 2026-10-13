@@ -88,9 +88,13 @@ Useful scripts (`pnpm --filter site <script>`): `dev`, `build`, `lint`,
 9. **Truck dashboard (optional):** set `SITE_ADMIN_API_TOKEN` here and the same
    value plus `SITE_URL=https://<domain>` in the truck's `.env` to enable its
    Website tabs.
-10. **Kitchen wait (optional):** set `KITCHEN_API_URL` to the truck's tunnel URL.
+10. **Instagram cron:** set `CRON_SECRET` to a random string
+    (`openssl rand -hex 32`). `vercel.json` already schedules the daily
+    Instagram refresh, which keeps the token renewed. Optionally add
+    `INSTAGRAM_APP_ID` and `INSTAGRAM_CLIENT_TOKEN` (see "Instagram posts" below).
+11. **Kitchen wait (optional):** set `KITCHEN_API_URL` to the truck's tunnel URL.
    Set `KITCHEN_API_TOKEN` to the same value in both apps.
-11. **Smoke test:** set status to Open, place a $1 order, and check that it shows
+12. **Smoke test:** set status to Open, place a $1 order, and check that it shows
     on the kitchen screen. Tap it done; the status page should say Ready and the
     text should arrive. Refund it in Square.
 
@@ -123,11 +127,44 @@ It talks to this site's admin API:
 | **Menu** | **Sync from Square** after changing names or prices in Square. Mark items **Sold out**, **Hidden** or **NEW**; add a Spanish tagline and a website photo. |
 | **Specials** | Create a special with an optional sticker, price and start/end time. Live specials show on Home and Specials. |
 | **Catering** | Leads move New → Contacted → Quoted → Booked / Declined. Tap to call, text or email, and keep private notes. |
-| **Gallery** | Approve or reject submitted photos and upload your own. Before any photo can go live, someone has to confirm that everyone identifiable in it agreed. Takedown requests: one tap removes the photo and resolves the request. |
+| **Gallery** | Approve or reject submitted photos and upload your own. Before any photo can go live, someone has to confirm that everyone identifiable in it agreed. Takedown requests: one tap removes the photo and resolves the request. **Instagram:** connect once and the gallery page shows your 3 latest posts (see below). |
 | **Partners** | Bars and bartenders: each gets a code, a link and a printable QR card. Shows scans, orders and revenue per partner. |
 | **Merch** | Products, sizes/colors, stock, photos; orders to pack and ship (add tracking → customer gets an email). |
 | **Subscribers** | Who's signed up (email / text), CSV export, and **Broadcast**: write a message, preview it, and send it to opted-in people only. |
 | **Analytics** | Visits and orders by weekday × hour (spot the slow Thu/Fri early evenings), top pages, partner referrals, catering pipeline, merch revenue. |
+
+## Instagram posts on the gallery page
+
+`/gallery` shows the 3 latest posts from your Instagram as Instagram's own
+embeds. Each one links to the post. Connect it once from Admin → Gallery or from
+the truck dashboard (Website → Gallery):
+
+1. Make your Instagram a **Professional** account (Business or Creator):
+   Instagram → Settings → Account type.
+2. At [developers.facebook.com/apps](https://developers.facebook.com/apps),
+   create an app and add the **Instagram** product.
+3. Under **API setup with Instagram login**, add your account and click
+   **Generate token**.
+4. Paste the token into the Gallery admin and click **Connect Instagram**.
+
+After that it runs by itself:
+- New posts appear within about 30 minutes. The site checks after a gallery
+  visit, at most every 30 minutes, plus the daily cron.
+- The token (good for 60 days) renews itself weekly.
+- Only each post's id, link, type and date are stored. Instagram renders the
+  post itself.
+- If something breaks, the posts already shown stay up and the admin shows what
+  went wrong.
+
+**Official embeds (optional).** Set `INSTAGRAM_APP_ID` and
+`INSTAGRAM_CLIENT_TOKEN` (Meta app → App settings → Basic / Advanced) to fetch
+embeds from Meta's oEmbed endpoint. It only works after Meta approves the app's
+**"Meta oEmbed Read"** feature in App Review. Until then the site uses
+Instagram's standard embed code, which looks the same, and the admin shows which
+one is in use.
+
+Code: `lib/instagram.ts`. For local testing without a real account, set
+`INSTAGRAM_API_BASE` to a mock of `graph.instagram.com` (ignored in production).
 
 ## Things the owner still needs to provide
 
@@ -137,6 +174,7 @@ It talks to this site's admin API:
   `NEXT_PUBLIC_LOGO_READY=1`.
 - **Real photos:** menu photos through Admin → Menu; story and gallery photos
   through the admin.
+- **Instagram:** connect it in Admin → Gallery (steps above).
 - **Content and details:**
   - Your own story on `/story` (the PLACEHOLDER blocks in
     `app/(public)/story/page.tsx`).

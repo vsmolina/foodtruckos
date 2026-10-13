@@ -1,6 +1,6 @@
 import Link from 'next/link';
-import type { GalleryCounts, GalleryPhotoDto, GalleryView, TakedownDto } from '@barrio/site-contract';
-import { dateTime } from '@/lib/format';
+import type { GalleryCounts, GalleryPhotoDto, GalleryView, InstagramStatusDto, TakedownDto } from '@barrio/site-contract';
+import { dateTime, shortDate } from '@/lib/format';
 import { siteAsset, siteData, sitePage } from '@/lib/site/api';
 import { ActionForm, FieldError } from '@/components/website/ActionForm';
 import { Field, inputClass, NoticeBanner, PrimaryButton, QuietButton } from '@/components/dashboard/form';
@@ -8,7 +8,10 @@ import { Empty, Panel, Pill } from '@/components/website/ui';
 import {
   approve,
   confirmConsent,
+  connectInstagram,
+  disconnectInstagram,
   dismissTakedown,
+  refreshInstagram,
   reject,
   remove,
   resolveTakedown,
@@ -39,6 +42,8 @@ const NOTICES: Record<string, string> = {
   restored: 'Moved back to Pending.',
   resolved: 'Photo taken down and request closed.',
   dismissed: 'Request closed. Nothing was removed.',
+  'ig-connected': 'Instagram connected. Your 3 latest posts are on the gallery page.',
+  'ig-disconnected': 'Instagram disconnected. Its posts are off the gallery page.',
 };
 
 /** Same wording the website stores with the photo (lib/gallery/consent.ts ADMIN_CONSENT). */
@@ -49,10 +54,12 @@ export default async function WebsiteGalleryPage({ searchParams }: PageProps<'/w
   const noticeText = typeof notice === 'string' ? NOTICES[notice] : undefined;
   const view: ViewKey = VIEWS.find((v) => v.key === raw)?.key ?? 'pending';
 
-  const data =
+  const [data, instagram] = await Promise.all([
     view === 'takedowns'
-      ? { kind: 'takedowns' as const, ...(await siteData('gallery.takedowns', {})) }
-      : { kind: 'photos' as const, ...(await siteData('gallery.list', { view: view as GalleryView })) };
+      ? siteData('gallery.takedowns', {}).then((d) => ({ kind: 'takedowns' as const, ...d }))
+      : siteData('gallery.list', { view: view as GalleryView }).then((d) => ({ kind: 'photos' as const, ...d })),
+    siteData('gallery.instagram', {}),
+  ]);
 
   return (
     <div className="grid gap-6">
@@ -93,6 +100,8 @@ export default async function WebsiteGalleryPage({ searchParams }: PageProps<'/w
       )}
 
       {view === 'pending' ? <UploadPanel /> : null}
+
+      <InstagramPanel ig={instagram} view={view} />
     </div>
   );
 }
@@ -227,6 +236,107 @@ function PhotoCard({ p }: { p: GalleryPhotoDto }): React.JSX.Element {
         ) : null}
       </div>
     </li>
+  );
+}
+
+function InstagramPanel({ ig, view }: { ig: InstagramStatusDto; view: ViewKey }): React.JSX.Element {
+  if (!ig.connected) {
+    return (
+      <Panel title="Instagram posts" description="Connect your Instagram and the gallery page shows your 3 latest posts, each linking to the post on Instagram.">
+        <ol className="mb-4 list-decimal space-y-1 pl-5 text-sm text-ink-2">
+          <li>Your Instagram must be a Professional account (Business or Creator: Instagram → Settings → Account type).</li>
+          <li>
+            At{' '}
+            <a href="https://developers.facebook.com/apps" target="_blank" rel="noreferrer" className="text-accent hover:underline">
+              developers.facebook.com/apps
+            </a>
+            , create an app and add the <strong>Instagram</strong> product.
+          </li>
+          <li>
+            Under “API setup with Instagram login”, add your account and click <strong>Generate token</strong>.
+          </li>
+          <li>Paste the token below. It renews itself from then on.</li>
+        </ol>
+        <TokenForm label="Access token" button="Connect Instagram" view={view} />
+      </Panel>
+    );
+  }
+  return (
+    <Panel
+      title="Instagram posts"
+      description={
+        <>
+          The gallery page shows the 3 latest posts from{' '}
+          <a href={`https://instagram.com/${ig.username}`} target="_blank" rel="noreferrer" className="text-accent hover:underline">
+            @{ig.username}
+          </a>
+          . New posts show up on their own within about 30 minutes.
+        </>
+      }
+    >
+      <div className="grid gap-4">
+        {ig.lastError ? (
+          <p role="alert" className="rounded-[var(--radius)] border border-[var(--danger)] px-3 py-2 text-sm text-danger">
+            {ig.lastError}
+          </p>
+        ) : null}
+        {ig.posts.length ? (
+          <ul className="grid gap-1 text-sm">
+            {ig.posts.map((p) => (
+              <li key={p.id}>
+                <a href={p.permalink} target="_blank" rel="noreferrer" className="text-accent hover:underline">
+                  {p.mediaType === 'VIDEO' ? 'Reel' : p.mediaType === 'CAROUSEL_ALBUM' ? 'Album' : 'Photo'} · {shortDate(p.postedAt)} ↗
+                </a>
+              </li>
+            ))}
+          </ul>
+        ) : (
+          <Empty>No posts pulled yet.</Empty>
+        )}
+        <p className="text-sm text-ink-2">
+          {ig.oembed
+            ? 'Shown with Instagram’s official embeds.'
+            : 'Shown with Instagram’s standard embed code. Once Meta approves the app’s “oEmbed Read” review, the site switches to official embeds by itself.'}
+        </p>
+        <p className="text-xs text-ink-3">
+          Last checked {ig.lastFetchedAt ? dateTime(ig.lastFetchedAt) : 'never'}
+          {ig.tokenExpiresAt ? ` · token renews itself weekly (current one good until ${shortDate(ig.tokenExpiresAt)})` : ''}
+        </p>
+        <div className="flex flex-wrap items-start gap-2">
+          <ActionForm action={refreshInstagram}>
+            <QuietButton>Refresh now</QuietButton>
+          </ActionForm>
+          <ActionForm action={disconnectInstagram.bind(null, view)}>
+            <button
+              type="submit"
+              className="rounded-[var(--radius)] border border-[var(--danger)] px-3 py-1.5 text-sm font-medium text-danger hover:bg-[var(--danger)] hover:text-white"
+            >
+              Disconnect
+            </button>
+          </ActionForm>
+        </div>
+        <details className="text-sm">
+          <summary className="cursor-pointer font-medium text-ink-2">Use a new token</summary>
+          <div className="mt-3">
+            <TokenForm label="New access token" button="Reconnect" view={view} />
+          </div>
+        </details>
+      </div>
+    </Panel>
+  );
+}
+
+function TokenForm({ label, button, view }: { label: string; button: string; view: ViewKey }): React.JSX.Element {
+  return (
+    <ActionForm action={connectInstagram.bind(null, view)} className="grid gap-3 sm:max-w-xl">
+      <Field label={label}>
+        <input name="accessToken" type="password" autoComplete="off" spellCheck={false} required className={`${inputClass} font-mono`} />
+        <FieldError name="accessToken" />
+      </Field>
+      <div>
+        <PrimaryButton>{button}</PrimaryButton>
+      </div>
+    </ActionForm>
   );
 }
 

@@ -1,6 +1,7 @@
 import 'server-only';
 import type { GalleryOps } from '@barrio/site-contract';
 import * as gallery from '@/lib/admin/gallery';
+import * as instagram from '@/lib/admin/instagram';
 import { ok } from '@/lib/admin/result';
 import { firstFile, type AreaHandlers } from '../define';
 
@@ -17,4 +18,8 @@ export const galleryHandlers: AreaHandlers<GalleryOps> = {
   'gallery.upload': (input, ctx) => gallery.uploadOwnerPhoto(firstFile(ctx, 'photo'), input),
   'gallery.resolveTakedown': (input) => gallery.resolveTakedown(input),
   'gallery.dismissTakedown': (input) => gallery.dismissTakedown(input),
+  'gallery.instagram': async () => ok(await instagram.instagramStatus()),
+  'gallery.instagramConnect': (input) => instagram.connectInstagram(input),
+  'gallery.instagramRefresh': () => instagram.refreshInstagram(),
+  'gallery.instagramDisconnect': () => instagram.disconnectInstagram(),
 };

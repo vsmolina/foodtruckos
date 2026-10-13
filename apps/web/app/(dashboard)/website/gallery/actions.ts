@@ -93,3 +93,20 @@ export async function dismissTakedown(id: string): Promise<FormState> {
   return moved(await siteApi('gallery.dismissTakedown', { id }), 'takedowns', 'dismissed');
 }
 
+
+/** Connect / disconnect swap the whole Instagram panel, so they report through a page notice too. */
+export async function connectInstagram(back: GalleryReturn, _prev: FormState, fd: FormData): Promise<FormState> {
+  await requireAdmin();
+  // A refresh problem right after connecting shows as the panel's own error line.
+  return moved(await siteApi('gallery.instagramConnect', { accessToken: str(fd, 'accessToken', 2000) }), back, 'ig-connected');
+}
+
+export async function refreshInstagram(): Promise<FormState> {
+  await requireAdmin();
+  return toFormState(await siteApi('gallery.instagramRefresh', {}), 'Up to date with Instagram.');
+}
+
+export async function disconnectInstagram(back: GalleryReturn): Promise<FormState> {
+  await requireAdmin();
+  return moved(await siteApi('gallery.instagramDisconnect', {}), back, 'ig-disconnected');
+}

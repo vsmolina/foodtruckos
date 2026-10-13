@@ -1,5 +1,6 @@
 import type { Metadata } from 'next';
 import Link from 'next/link';
+import { after } from 'next/server';
 import { GalleryGrid } from '@/components/gallery/GalleryGrid';
 import { InstagramEmbeds } from '@/components/gallery/InstagramEmbeds';
 import { LinkButton } from '@/components/ui/Button';
@@ -8,6 +9,7 @@ import { SectionHeading } from '@/components/ui/SectionHeading';
 import { PhotoSlot } from '@/components/ui/Slots';
 import { Sticker } from '@/components/ui/Sticker';
 import { getPublishedPhotos } from '@/lib/gallery/queries';
+import { getEmbeds, refreshIfStale } from '@/lib/instagram';
 import { getSettings } from '@/lib/status';
 
 export const metadata: Metadata = {
@@ -16,11 +18,9 @@ export const metadata: Metadata = {
 };
 
 export default async function GalleryPage() {
-  const [photos, settings] = await Promise.all([getPublishedPhotos(), getSettings()]);
-  const igUrls = (process.env.INSTAGRAM_EMBED_POST_URLS ?? '')
-    .split(',')
-    .map((u) => u.trim())
-    .filter((u) => /^https:\/\/(www\.)?instagram\.com\/(p|reel)\//.test(u));
+  const [photos, settings, igPosts] = await Promise.all([getPublishedPhotos(), getSettings(), getEmbeds()]);
+  // Pull newer posts after the response is sent (at most every 30 min); the next visitor sees them.
+  after(refreshIfStale);
 
   return (
     <div className="mx-auto max-w-6xl px-4 pt-10">
@@ -71,8 +71,8 @@ export default async function GalleryPage() {
           </a>
         </div>
         <div className="mt-8">
-          {igUrls.length > 0 ? (
-            <InstagramEmbeds urls={igUrls} />
+          {igPosts.length > 0 ? (
+            <InstagramEmbeds posts={igPosts} />
           ) : (
             <a href={`https://instagram.com/${settings.instagram}`} rel="noopener" className="group block no-underline" aria-label={`See @${settings.instagram} on Instagram`}>
               <ul className="grid grid-cols-3 gap-3">

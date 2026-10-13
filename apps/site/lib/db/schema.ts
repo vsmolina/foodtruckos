@@ -290,6 +290,39 @@ export const takedownRequests = pgTable('takedown_requests', {
   createdAt: createdAt(),
 });
 
+// ------------------------------------------------------------- instagram ----
+
+/**
+ * Single row (id = 1): the owner's connected Instagram professional account.
+ * The token is a long-lived Instagram API token (60 days); lib/instagram.ts
+ * renews it weekly so it never lapses. Never sent to a browser.
+ */
+export const instagramAccount = pgTable('instagram_account', {
+  id: smallint('id').primaryKey().default(1),
+  accessToken: text('access_token').notNull(),
+  igUserId: text('ig_user_id').notNull(),
+  username: text('username').notNull(),
+  tokenExpiresAt: timestamp('token_expires_at', { withTimezone: true }),
+  tokenRefreshedAt: timestamp('token_refreshed_at', { withTimezone: true }).notNull().defaultNow(),
+  /** Last time a fetch was started (also the lock that keeps refreshes from overlapping). */
+  lastFetchedAt: timestamp('last_fetched_at', { withTimezone: true }),
+  lastError: text('last_error'),
+  connectedAt: createdAt(),
+});
+
+/**
+ * The latest posts: just enough to embed them (Instagram renders the post
+ * itself; we store no images or captions).
+ */
+export const instagramPosts = pgTable('instagram_posts', {
+  /** Instagram media id. */
+  id: text('id').primaryKey(),
+  permalink: text('permalink').notNull(),
+  mediaType: text('media_type').notNull(), // IMAGE | VIDEO | CAROUSEL_ALBUM
+  postedAt: timestamp('posted_at', { withTimezone: true }).notNull(),
+  createdAt: createdAt(),
+});
+
 // -------------------------------------------------------------- catering ----
 
 export const leadStatus = pgEnum('lead_status', ['new', 'contacted', 'quoted', 'booked', 'declined']);
