@@ -13,6 +13,7 @@ import { logger } from '@/lib/logger';
 import { publish } from '@/lib/realtime/channel';
 import type { KdsTicket } from '@/lib/kds/types';
 import { retrieveOrder } from './client';
+import { isUnpaidWebOrder, setPickupState } from './pickup';
 
 /** BigInt cents → number cents. Square amounts are always minor units. */
 function cents(m: Square.Money | null | undefined): number {
@@ -187,6 +188,10 @@ export async function upsertOrder(sqOrder: Square.Order): Promise<void> {
       return { type: 'ticket:removed', ticket: toTicketPayload(ticket, orderRow, items) };
     }
 
+    // Website orders reach the kitchen once paid (the payment's order.updated
+    // brings them back here with a tender).
+    if (!ticket && isUnpaidWebOrder(sqOrder)) return null;
+
     if (!ticket) {
       [ticket] = await tx.insert(kitchenTickets).values({ orderId: orderRow.id }).returning();
       if (!ticket) throw new Error('failed to create kitchen ticket');
@@ -196,6 +201,8 @@ export async function upsertOrder(sqOrder: Square.Order): Promise<void> {
   });
 
   if (event) {
+    // A website pickup order just reached the board → "Preparing" on the customer's status page.
+    if (event.type === 'ticket:created') void setPickupState(squareOrderId, 'RESERVED', { onlyFrom: ['PROPOSED'] });
     await publish(`kds:store:${storeId}`, event);
     logger.info({ squareOrderId, type: event.type }, 'kds event published');
   }

@@ -9,6 +9,7 @@ import { subscribe } from '@/lib/realtime/channel';
 import { getActiveTickets, getRecentDoneTickets, getTicket } from '@/lib/kds/snapshot';
 import { SOCKET, type KdsEvent, type KdsTicket } from '@/lib/kds/types';
 import { logger } from '@/lib/logger';
+import { setPickupStateForTicket } from '@/lib/square/pickup';
 import { closeSquareSyncQueue, startSquareSyncWorker, syncEnabled } from '@/lib/queue/square-sync';
 
 /**
@@ -63,7 +64,10 @@ app.prepare().then(async () => {
           .set({ state: 'done', completedAt: new Date() })
           .where(eq(kitchenTickets.id, ticketId))
           .returning();
-        if (row) io.to(roomFor(storeId)).emit(SOCKET.removed, { id: row.id, orderId: row.orderId });
+        if (row) {
+          io.to(roomFor(storeId)).emit(SOCKET.removed, { id: row.id, orderId: row.orderId });
+          void setPickupStateForTicket(row.id, 'PREPARED'); // website order → "Ready" + text
+        }
       } catch (err) {
         logger.error({ err: err instanceof Error ? err.message : String(err), ticketId }, 'kds complete failed');
       }
@@ -92,7 +96,10 @@ app.prepare().then(async () => {
           .where(and(eq(kitchenTickets.id, ticketId), eq(kitchenTickets.state, 'done')))
           .returning({ id: kitchenTickets.id });
         const ticket = row ? await getTicket(row.id) : null;
-        if (ticket) io.to(roomFor(storeId)).emit(SOCKET.created, { ...ticket, recalled: true });
+        if (ticket) {
+          io.to(roomFor(storeId)).emit(SOCKET.created, { ...ticket, recalled: true });
+          void setPickupStateForTicket(ticket.id, 'RESERVED');
+        }
       } catch (err) {
         logger.error({ err: err instanceof Error ? err.message : String(err), ticketId }, 'kds recall failed');
       }

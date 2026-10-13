@@ -43,6 +43,18 @@ Tested on the real Raspberry Pi with a sandbox "lunch rush". Committed locally
   sandbox orders (with modifiers, notes, allergies) to exercise the KDS. Sandbox only.
 - Sandbox data: ~150 test orders from the rush are in the local database.
 
+### 2026-10-12 — customer website (`apps/site`) — UNCOMMITTED
+
+Built all 7 phases of the Barrio Burger Co. website in `apps/site` (see
+`apps/site/README.md`, `PLAN.md`, `design/DESIGN.md`). Square is the bridge:
+web orders are Square orders, so they reach the KDS with no KDS changes;
+foodtruck-os now moves the PICKUP fulfillment (RESERVED on ticket, PREPARED on
+done) and serves `GET /api/public/kitchen` for the wait estimate. Verified on
+the Square sandbox end to end. Owner inputs still needed: flyers, logo, photos,
+story copy, real hours/partners, Stripe/Twilio/Resend/Neon/Vercel accounts, legal
+review. Local: `pnpm --filter site dev` → http://localhost:3020 (admin password
+in `apps/site/.env` comment).
+
 ## Where the code is
 
 - Branch **`feat/phase-4-dashboard`**, pushed to GitHub up to `b017dc7`; the
