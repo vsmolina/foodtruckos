@@ -1,4 +1,4 @@
-# Status — where things stand (paused 2026-10-06)
+# Status — where things stand (paused 2026-10-12)
 
 Picking this up later? Read this first, then the [README](../README.md).
 
@@ -16,22 +16,41 @@ Square **sandbox**:
 - `docker compose up` works on a fresh machine; README covers dev, config and the
   mini-PC deploy; follow-up ideas in [`BACKLOG.md`](BACKLOG.md).
 
+### Session 2026-10-12 — KDS on the Pi + redesign
+
+Tested on the real Raspberry Pi with a sandbox "lunch rush". Committed locally
+(`a842905`), not pushed yet:
+
+- **Pi works.** `next.config.ts` now allows the Mac's LAN IPs as `allowedDevOrigins`
+  (the Pi showed "Offline" without it) and hides the Next dev indicator.
+- **KDS redesign** (light theme, built from a kitchen-display research write-up:
+  https://claude.ai/code/artifact/66dac676-b78d-4d3c-9eac-9a6e02c5e49d):
+  - Tap a card → it lifts and arms; second tap or 1.5 s auto-confirms. Cancel / ✓ Done
+    buttons on the armed card. Several armed cards each clear on their own countdown.
+    Scrolling/dragging an armed card pauses its countdown. The old confirm modal is gone.
+  - Long orders become tall cards (2 rows) and scroll inside; "+N more waiting" tile.
+  - Modifiers tagged **NO** (red) / **ADD**, **EXTRA** (blue); notes in yellow;
+    allergy notes get a red banner (`lib/kds/modifiers.ts`).
+  - Slow (3 min, amber) / Late (7 min, red, pulses 3× then holds) — `lib/kds/tiers.ts`.
+  - **Recent** panel → "Bring back" recalls a finished ticket with its original time.
+  - A− / A+ text size on the footer (saved per screen).
+  - Burger favicon (`app/icon.svg`) instead of the Next logo.
+- **Dashboard redesign** with the same rules: Today compares against the same weekday
+  last week up to now; tiles for Sales, Orders, Avg ticket time, In the kitchen now;
+  orders tables show what was ordered and kitchen time with Slow/Late pills; Reports
+  ticket-time chart has 3 / 7 min reference lines.
+- **`pnpm --filter web square:sandbox-rush [min] [minGap] [maxGap]`** — rings up random
+  sandbox orders (with modifiers, notes, allergies) to exercise the KDS. Sandbox only.
+- Sandbox data: ~150 test orders from the rush are in the local database.
+
 ## Where the code is
 
-- All work is on branch **`feat/phase-4-dashboard`**, pushed to GitHub. `main` on
-  GitHub is still the end of Phase 2 — **the PR has not been opened yet** (14
-  commits: Phase 3 KDS, Phase 4, Phase 5, Docker + docs).
-- Open it here, using the description below:
+- Branch **`feat/phase-4-dashboard`**, pushed to GitHub up to `b017dc7`; the
+  2026-10-12 commits are local — `git push` them.
+- `main` on GitHub is still the end of Phase 2 — **the PR has not been opened yet**.
+  Open it here, using the description at the bottom:
   https://github.com/vsmolina/foodtruckos/compare/main...feat/phase-4-dashboard?expand=1
 - Title: `Phases 3–5: KDS, dashboard, Square menu sync, Docker + docs`
-
-## State of the data (sandbox)
-
-- Local menu = the **placeholder** seed menu (9 items, 4 categories). It has been pushed
-  to the Square sandbox catalog, so both sides match (verified item by item).
-- No orders in the database (test orders were cleared).
-- The admin login exists (`INITIAL_ADMIN_EMAIL`); reset it with
-  `pnpm --filter web admin:set-password <email> <password>` if forgotten.
 
 ## How to start it again (this Mac)
 
@@ -43,21 +62,38 @@ pnpm dev                     # hot reload; .env is loaded automatically
 
 On this Mac `.env` has `PORT=3010`, because the host Cloudflare tunnel sends the
 public webhook hostname to `localhost:3010`. Check `curl localhost:3010/api/health`.
+Pi kiosk: `apps/web/scripts/pi-kiosk-setup.sh <mac-lan-ip> <store-id> 3010` (Mac is
+`192.168.1.88` on the home Wi-Fi). If CSS changes don't show, restart `pnpm dev`.
 
 ## Next steps (in order)
 
-1. **Open and merge the PR** (link above).
-2. **Hardware checks** (the MVP items not verifiable without devices):
-   - Pi: `apps/web/scripts/pi-kiosk-setup.sh <mac-lan-ip> <store-id> 3010`, then
-     `pnpm --filter web square:sandbox-order` → ticket on the Pi in < 1 s → tap done.
-   - Square POS: change a price in Menu → it shows on the POS device.
-3. **Real menu:** enter Victor's real items in the Square dashboard → **Pull from Square**
-   (replaces the placeholders).
-4. **Go live:** README → "Deploy to the truck's mini PC". Production credentials,
-   **Pull from Square first**, register the production webhook, one real order end to end.
-5. **Use it for two weeks** before any new features; then pick Phase 6 from
-   [`BACKLOG.md`](BACKLOG.md). Suggested first fix: "Orders closed" should count
-   kitchen-finished tickets (Square closes orders the moment they're paid).
+1. **Push the 2026-10-12 commits** and run the e2e suite against a prod build
+   (`tests/e2e/kds.spec.ts` was updated for arm/auto-confirm/recall but **not run**).
+2. **Update `docs/03-DESIGN-SYSTEM.md`** — it still says the KDS is dark, lists the old
+   colours and describes the removed confirm modal.
+3. **Open and merge the PR** (link above).
+4. **Automatic menu pull from Square** (not built): subscribe to
+   `catalog.version.updated` (add it to `EVENT_TYPES` in
+   `scripts/register-square-webhook.ts`), handle it in
+   `app/api/webhooks/square/route.ts` by queueing a debounced (~10 s) `pullCatalog()`
+   that waits while local pushes are pending; show "Updated from Square N min ago" on
+   the Menu page. Test on sandbox first.
+5. **Square POS check:** change a price in Menu → it shows on the POS device. Confirm
+   with Victor that the POS rings up **itemized** orders (custom amounts arrive with no items).
+6. **Real menu:** enter Victor's real items in the Square dashboard.
+7. **Go live on the truck's mini PC** (README → "Deploy to the truck's mini PC"), with a
+   clean database — not this Mac's sandbox data:
+   - `.env`: `SQUARE_ENVIRONMENT=production`, production `SQUARE_ACCESS_TOKEN`,
+     `SQUARE_APPLICATION_ID`, `SQUARE_LOCATION_ID` (`pnpm --filter web square:locations`).
+   - **Pull from Square first** (production pushes are blocked until then).
+   - Production webhook subscription → `https://foodtruck.matmx.com.mx/api/webhooks/square`
+     (must equal `SQUARE_WEBHOOK_NOTIFICATION_URL` exactly), events `order.created`,
+     `order.updated`, `order.fulfillment.updated`, `payment.created`, `payment.updated`;
+     signature key → `SQUARE_WEBHOOK_SIGNATURE_KEY`. Restart.
+   - Re-point the Cloudflare tunnel hostname from this Mac to the mini PC.
+   - Point the Pi at the mini PC; ring a $1 real order end to end, then refund it.
+8. **Use it for two weeks** before any new features; then pick Phase 6 from
+   [`BACKLOG.md`](BACKLOG.md).
 
 ## Gotchas to remember
 

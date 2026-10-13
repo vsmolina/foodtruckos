@@ -36,3 +36,9 @@ before adding anything.
   TypeScript server). Compiling `server.ts` ahead of time would shrink it.
 - **Unused email settings** (`EMAIL_FROM`, `SMTP_*`, `nodemailer`) remain from the
   magic-link login; remove if email notifications never materialize.
+- **KDS "+N more waiting" tile can land mid-board** — the grid's `column dense` flow
+  backfills around tall cards. Pin it to the last slot.
+- **KDS grow vs. scroll** — long orders currently both grow (tall card) and scroll.
+  Try each alone on the truck and keep the one cooks prefer (a toggle would help).
+- **Self-host the design fonts** (Fraunces, IBM Plex Sans, JetBrains Mono) under
+  `public/fonts`; the app falls back to system faces today.
