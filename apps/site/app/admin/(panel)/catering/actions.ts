@@ -1,30 +1,18 @@
 'use server';
 
-import { revalidatePath } from 'next/cache';
-import { eq } from 'drizzle-orm';
-import { z } from 'zod';
+import { updateLead as update } from '@/lib/admin/catering';
 import { requireAdmin } from '@/lib/auth';
-import { LEAD_STAGES } from '@/lib/catering';
-import { db } from '@/lib/db/client';
-import { cateringLeads } from '@/lib/db/schema';
 
-const updateSchema = z.object({
-  id: z.uuid(),
-  status: z.enum(LEAD_STAGES),
-  adminNotes: z.string().max(5000).optional(),
-});
+// Thin wrapper: the logic lives in lib/admin/catering.ts, shared with the admin
+// API that the truck dashboard calls.
 
 export async function updateLead(form: FormData): Promise<void> {
   await requireAdmin();
-  const parsed = updateSchema.parse({
+  const adminNotes = form.get('adminNotes');
+  const result = await update({
     id: form.get('id'),
     status: form.get('status'),
-    adminNotes: form.get('adminNotes') ?? undefined,
+    ...(typeof adminNotes === 'string' ? { adminNotes } : {}),
   });
-  await db
-    .update(cateringLeads)
-    .set({ status: parsed.status, ...(parsed.adminNotes !== undefined ? { adminNotes: parsed.adminNotes.trim() || null } : {}) })
-    .where(eq(cateringLeads.id, parsed.id));
-  revalidatePath('/admin/catering');
-  revalidatePath(`/admin/catering/${parsed.id}`);
+  if (!result.ok) throw new Error(result.error);
 }

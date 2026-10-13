@@ -13,6 +13,8 @@ WORKDIR /app
 # Copy only manifests first for better layer caching.
 COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
 COPY apps/web/package.json ./apps/web/package.json
+# Types-only contract for the website admin API (apps/web depends on it).
+COPY packages/site-contract/package.json ./packages/site-contract/package.json
 RUN pnpm install --frozen-lockfile
 
 # --- builder: production build --------------------------------------------------

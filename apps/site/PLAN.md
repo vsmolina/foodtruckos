@@ -17,6 +17,7 @@ on it. **Square is the bridge**; the website has its **own cloud database**.
 | Order status | Square fulfillment state | foodtruck-os moves the PICKUP fulfillment: ticket created → `RESERVED` (Preparing), ticket done → `PREPARED` (Ready), recall → `RESERVED`. Site reads it (status-page polling + `order.fulfillment.updated` webhook) → Received → Preparing → Ready, and texts the customer on Ready. |
 | Open / closed / back soon, ordering paused | Site DB (`site_settings`) | `/admin/status` on the owner's phone. The POS can set it via `POST /api/integrations/status` (bearer `SITE_INTEGRATION_TOKEN`). |
 | Current wait | foodtruck-os `GET /api/public/kitchen` (via the tunnel) | Best effort, 1.5 s timeout, falls back to the admin's default wait. |
+| Managing the website from the truck dashboard | Site DB, via the site's admin API | foodtruck-os **Website** tabs call `POST /api/admin/v1/<op>` server-to-server (bearer `SITE_ADMIN_API_TOKEN`). Ops and types: `packages/site-contract`. The same logic (`lib/admin/*`) backs the site's own `/admin`, so either place works; the site admin stays available when the truck PC is off. |
 
 ## Stack
 

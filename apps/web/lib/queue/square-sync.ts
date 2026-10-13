@@ -4,6 +4,7 @@ import Redis from 'ioredis';
 import { db } from '@/lib/db/client';
 import { menuCategories, menuItems } from '@/lib/db/schema';
 import { logger } from '@/lib/logger';
+import { siteApi, siteConfigured } from '@/lib/site/api';
 import {
   deleteCatalogObjects,
   deleteUnusedLists,
@@ -137,8 +138,33 @@ export function startSquareSyncWorker(): Worker<SyncJob> {
       logger.error({ err: String(e) }, 'could not record sync failure'),
     );
   });
-  worker.on('completed', (job) => logger.info({ job: job.name, data: job.data }, 'square sync done'));
+  worker.on('completed', (job) => {
+    logger.info({ job: job.name, data: job.data }, 'square sync done');
+    scheduleWebsiteMenuSync();
+  });
   return worker;
+}
+
+// --- Website follow-up ------------------------------------------------------
+// After a successful push, ask the customer website to pull the catalog so new
+// or changed products show up without waiting for Square's webhook. Debounced:
+// a burst of pushes (e.g. "Push all") leads to one website sync. Best effort —
+// it never affects the Square job, and siteApi never throws.
+
+const WEBSITE_SYNC_DEBOUNCE_MS = 5_000;
+let websiteSyncTimer: ReturnType<typeof setTimeout> | null = null;
+
+function scheduleWebsiteMenuSync(): void {
+  if (!siteConfigured()) return;
+  if (websiteSyncTimer) clearTimeout(websiteSyncTimer);
+  websiteSyncTimer = setTimeout(() => {
+    websiteSyncTimer = null;
+    void siteApi('menu.sync', {}).then((r) => {
+      if (r.ok) logger.info(r.data, 'website menu synced from square');
+      else logger.warn({ err: r.error }, 'website menu sync failed');
+    });
+  }, WEBSITE_SYNC_DEBOUNCE_MS);
+  websiteSyncTimer.unref?.();
 }
 
 /** Close the queue's connection (graceful shutdown). */

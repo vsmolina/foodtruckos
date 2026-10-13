@@ -20,6 +20,9 @@ const nextConfig: NextConfig = {
   // Monorepo root is two levels up; silences Next's workspace-root inference.
   outputFileTracingRoot: path.join(__dirname, '../../'),
   experimental: {
+    // Website tabs forward photo uploads (menu, merch, gallery) to the site,
+    // which accepts up to 8 MB per image.
+    serverActions: { bodySizeLimit: '10mb' },
     // Turbopack's persistent dev cache (.next/dev/cache) bloats over sessions
     // and, once stale, makes the dev server's memory grow ~30 MB/s while idle
     // until it dies with "JavaScript heap out of memory" (vercel/next.js#94915,

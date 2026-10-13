@@ -43,7 +43,7 @@ Tested on the real Raspberry Pi with a sandbox "lunch rush". Committed locally
   sandbox orders (with modifiers, notes, allergies) to exercise the KDS. Sandbox only.
 - Sandbox data: ~150 test orders from the rush are in the local database.
 
-### 2026-10-12 — customer website (`apps/site`) — UNCOMMITTED
+### 2026-10-12 — customer website (`apps/site`) — committed on `feat/customer-site` (af02b41)
 
 Built all 7 phases of the Barrio Burger Co. website in `apps/site` (see
 `apps/site/README.md`, `PLAN.md`, `design/DESIGN.md`). Square is the bridge:
@@ -54,6 +54,22 @@ the Square sandbox end to end. Owner inputs still needed: flyers, logo, photos,
 story copy, real hours/partners, Stripe/Twilio/Resend/Neon/Vercel accounts, legal
 review. Local: `pnpm --filter site dev` → http://localhost:3020 (admin password
 in `apps/site/.env` comment).
+
+### 2026-10-13 — dashboard **Website** tabs — UNCOMMITTED
+
+The dashboard (`apps/web`) now has a Website section (`/website/*`) with tabs:
+Status, Menu extras, Specials, Merch (create products with photos/variants,
+orders), Gallery, Partners (+ printable QR), Catering, Subscribers (CSV,
+broadcasts), Web orders & traffic; plus a Website card on Today. It calls the
+site's admin API server-to-server — `POST {SITE_URL}/api/admin/v1/<op>`,
+bearer `SITE_ADMIN_API_TOKEN` (same value in root `.env` and `apps/site/.env`).
+Types-only contract: `packages/site-contract`. Logic is in
+`apps/site/lib/admin/*`, shared with the site's own `/admin` (still works,
+e.g. when the truck PC is off). After a Square menu push the dashboard asks
+the site to re-sync its menu (debounced 5 s). The dashboard shell is now
+responsive (top nav on phones). Verified: both apps typecheck, lint and build;
+every tab driven end to end in a browser at 1280 and 390 px. Not yet tested:
+the Docker image build (Dockerfile now copies the contract package manifest).
 
 ## Where the code is
 

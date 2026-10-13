@@ -19,7 +19,7 @@ export function NavLink({
     <Link
       href={href}
       aria-current={active ? 'page' : undefined}
-      className={`rounded-[var(--radius)] px-2 py-1.5 text-sm transition-colors ${
+      className={`whitespace-nowrap rounded-[var(--radius)] px-2 py-1.5 text-sm transition-colors ${
         active ? 'bg-bg-sunken font-medium text-ink' : 'text-ink-2 hover:bg-bg-sunken'
       }`}
     >

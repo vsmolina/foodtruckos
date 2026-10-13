@@ -1,11 +1,11 @@
 import Link from 'next/link';
-import { desc, sql } from 'drizzle-orm';
+import { desc } from 'drizzle-orm';
 import { AdminPage, Card, Empty, Pill, Stat } from '@/components/admin/ui';
 import { requireAdmin } from '@/lib/auth';
 import { db } from '@/lib/db/client';
 import { webOrders } from '@/lib/db/schema';
-import { clockTime, money, TIMEZONE } from '@/lib/format';
-import { getSettings } from '@/lib/status';
+import { today } from '@/lib/admin/insights';
+import { clockTime, money } from '@/lib/format';
 
 export const dynamic = 'force-dynamic';
 
@@ -27,29 +27,11 @@ const ORDER_PILL = {
 
 export default async function AdminTodayPage() {
   await requireAdmin();
-  const settings = await getSettings();
-  // "Tonight" = since 5 AM local (a night runs 5 AM → 5 AM).
-  const [counts] = await db.execute<{
-    orders: number;
-    revenue: number;
-    leads: number;
-    photos: number;
-    takedowns: number;
-    to_ship: number;
-  }>(sql`
-    with night as (
-      select ((date_trunc('day', (now() at time zone ${TIMEZONE}) - interval '5 hours') + interval '5 hours') at time zone ${TIMEZONE}) as start
-    )
-    select
-      (select count(*)::int from web_orders, night where created_at >= night.start and status in ('received','preparing','ready','picked_up')) as orders,
-      (select coalesce(sum(total_cents),0)::int from web_orders, night where created_at >= night.start and status in ('received','preparing','ready','picked_up')) as revenue,
-      (select count(*)::int from catering_leads where status in ('new','contacted','quoted')) as leads,
-      (select count(*)::int from gallery_photos where status = 'pending') as photos,
-      (select count(*)::int from takedown_requests where status = 'open') as takedowns,
-      (select count(*)::int from merch_orders where status = 'paid') as to_ship`);
+  const t = await today();
   const latest = await db.select().from(webOrders).orderBy(desc(webOrders.createdAt)).limit(5);
-  const s = STATUS_PILL[settings.status];
-  const c = counts ?? { orders: 0, revenue: 0, leads: 0, photos: 0, takedowns: 0, to_ship: 0 };
+  const settings = t;
+  const s = STATUS_PILL[t.status];
+  const c = { orders: t.ordersTonight, revenue: t.revenueTonightCents, leads: t.openLeads, photos: t.photosPending, takedowns: t.takedownsOpen, to_ship: t.merchToShip };
 
   return (
     <AdminPage title="Today">

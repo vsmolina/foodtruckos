@@ -5,6 +5,7 @@ import { StatTile } from '@/components/dashboard/StatTile';
 import { StatusBadge } from '@/components/dashboard/StatusBadge';
 import { TicketTime } from '@/components/dashboard/TicketTime';
 import { SalesByHourChart } from '@/components/reports/SalesByHourChart';
+import { WebsiteTodayCard } from '@/components/website/WebsiteTodayCard';
 import { compare } from '@/lib/compare';
 import { tierFor, TIER_WORD } from '@/lib/kds/tiers';
 import { money, duration, orderNumber, clockTime } from '@/lib/format';
@@ -88,6 +89,8 @@ export default async function TodayPage(): Promise<React.JSX.Element> {
           }
         />
       </div>
+
+      <WebsiteTodayCard />
 
       <section className="mt-6 rounded-[var(--radius-lg)] border border-[var(--rule)] bg-bg-raised p-5">
         <div className="flex items-baseline justify-between">

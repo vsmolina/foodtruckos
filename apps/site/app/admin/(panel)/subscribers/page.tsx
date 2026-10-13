@@ -3,17 +3,10 @@ import { AdminPage, Card, Empty, Pill, Stat } from '@/components/admin/ui';
 import { requireAdmin } from '@/lib/auth';
 import { db } from '@/lib/db/client';
 import { broadcasts, specials, subscribers } from '@/lib/db/schema';
-import { dateTime, prettyPhone, shortDate } from '@/lib/format';
+import { maskEmail, maskPhone } from '@/lib/admin/subscribers';
+import { dateTime, shortDate } from '@/lib/format';
 import { emailActive, smsActive } from '@/lib/subscribers';
 import { BroadcastComposer } from './BroadcastComposer';
-
-function maskEmail(email: string): string {
-  const [u = '', d = ''] = email.split('@');
-  return `${u.slice(0, 2)}•••@${d}`;
-}
-function maskPhone(phone: string): string {
-  return prettyPhone(phone).replace(/\d{3}-(\d{4})$/, '•••-$1').replace(/^\(\d{3}\)/, '(•••)');
-}
 
 export default async function SubscribersAdmin() {
   await requireAdmin();

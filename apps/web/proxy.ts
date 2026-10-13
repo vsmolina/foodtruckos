@@ -8,8 +8,8 @@ import { NextResponse, type NextRequest } from 'next/server';
 //  2. dashboard   — signed-in admin only. This is an OPTIMISTIC check: with the
 //     (/, /orders,  database session strategy the cookie is an opaque token, so
 //      /reports,    we only verify its presence here and redirect to /login when
-//      /settings)   absent. The authoritative check is `await auth()` in the
-//                   (dashboard) layout.
+//      /settings,   absent. The authoritative check is `await auth()` in the
+//      /website)    (dashboard) layout.
 
 const LAN = [
   /^127\./,
@@ -55,5 +55,5 @@ export function proxy(req: NextRequest): NextResponse {
 }
 
 export const config = {
-  matcher: ['/kds/:path*', '/', '/orders/:path*', '/reports/:path*', '/settings/:path*'],
+  matcher: ['/kds/:path*', '/', '/orders/:path*', '/reports/:path*', '/settings/:path*', '/website/:path*'],
 };

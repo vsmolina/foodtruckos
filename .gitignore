@@ -32,3 +32,9 @@ pnpm-debug.log*
 .DS_Store
 .idea/
 *.swp
+
+# Dev uploads from the website (production uses Vercel Blob)
+apps/site/public/uploads/
+
+# TypeScript incremental build cache
+*.tsbuildinfo

@@ -13,6 +13,7 @@ import { RefreshWhilePending } from '@/components/dashboard/RefreshWhilePending'
 import { SyncBadge } from '@/components/dashboard/SyncBadge';
 import { dollarsInput } from '@/lib/format';
 import { syncEnabled } from '@/lib/queue/square-sync';
+import { siteConfigured } from '@/lib/site/api';
 import {
   addModifier,
   addVariation,
@@ -69,6 +70,11 @@ export default async function EditMenuItemPage({
             <QuietButton>Retry</QuietButton>
           </form>
         </div>
+      ) : null}
+      {item.squareId && siteConfigured() ? (
+        <Link href={`/website/menu#sq-${item.squareId}`} className="mt-2 inline-block text-sm font-medium text-accent hover:underline">
+          Website photo, tagline &amp; visibility →
+        </Link>
       ) : null}
       <NoticeBanner notice={noticeFor(sp.notice)} />
       <RefreshWhilePending active={item.syncStatus === 'pending'} />

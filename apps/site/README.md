@@ -85,11 +85,33 @@ Useful scripts (`pnpm --filter site <script>`): `dev`, `build`, `lint`,
    - Set the `TWILIO_*` variables.
 8. **Email:** verify your domain in Resend and set `RESEND_API_KEY`,
    `EMAIL_FROM` and `OWNER_EMAIL`.
-9. **Kitchen wait (optional):** set `KITCHEN_API_URL` to the truck's tunnel URL.
+9. **Truck dashboard (optional):** set `SITE_ADMIN_API_TOKEN` here and the same
+   value plus `SITE_URL=https://<domain>` in the truck's `.env` to enable its
+   Website tabs.
+10. **Kitchen wait (optional):** set `KITCHEN_API_URL` to the truck's tunnel URL.
    Set `KITCHEN_API_TOKEN` to the same value in both apps.
-10. **Smoke test:** set status to Open, place a $1 order, and check that it shows
+11. **Smoke test:** set status to Open, place a $1 order, and check that it shows
     on the kitchen screen. Tap it done; the status page should say Ready and the
     text should arrive. Refund it in Square.
+
+## Managing the site from the truck dashboard
+
+The foodtruck-os dashboard (`apps/web`) has a **Website** section with tabs for
+everything below, so the owner can run the truck and the website from one place.
+It talks to this site's admin API:
+
+- `POST /api/admin/v1/<op>` with `Authorization: Bearer $SITE_ADMIN_API_TOKEN`.
+  The ops and their types live in `packages/site-contract`; the logic in
+  `lib/admin/*` is shared with this site's own `/admin`.
+- Set the **same** random token (`openssl rand -hex 32`) as
+  `SITE_ADMIN_API_TOKEN` here and in the root `.env`, plus `SITE_URL` (this
+  site's URL) in the root `.env`. The API is off when the token is unset.
+- Food items are still created under the dashboard's **Menu** (they go to
+  Square); after each push the dashboard asks the site to re-sync, and the
+  **Menu extras** tab adds the website-only bits (photo, Spanish tagline,
+  hidden, NEW).
+- This site's `/admin` keeps working on its own, e.g. from a phone when the
+  truck's PC is off.
 
 ## Running the admin (from your phone)
 

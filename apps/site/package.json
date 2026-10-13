@@ -31,7 +31,8 @@
     "stripe": "^23.0.0",
     "twilio": "^6.2.0",
     "uuidv7": "^1.2.1",
-    "zod": "^4.6.7"
+    "zod": "^4.6.7",
+    "@barrio/site-contract": "workspace:*"
   },
   "devDependencies": {
     "@playwright/test": "^1.61.1",

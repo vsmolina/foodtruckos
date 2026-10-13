@@ -75,6 +75,7 @@ function CategorySection({
       {category.items.length === 0 ? (
         <p className="px-4 py-3 text-sm text-ink-3">No items yet.</p>
       ) : (
+        <div className="overflow-x-auto">
         <table className="w-full text-sm">
           <tbody>
             {category.items.map((item) => (
@@ -108,6 +109,7 @@ function CategorySection({
             ))}
           </tbody>
         </table>
+        </div>
       )}
 
       <div className="border-t border-[var(--rule)] px-4 py-2">
