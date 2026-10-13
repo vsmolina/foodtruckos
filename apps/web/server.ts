@@ -1,13 +1,13 @@
 import { createServer } from 'node:http';
 import next from 'next';
 import { Server as SocketIOServer } from 'socket.io';
-import { eq } from 'drizzle-orm';
+import { and, eq } from 'drizzle-orm';
 import { db, sql } from '@/lib/db/client';
 import { kitchenTickets } from '@/lib/db/schema';
 import { redis } from '@/lib/redis';
 import { subscribe } from '@/lib/realtime/channel';
-import { getActiveTickets } from '@/lib/kds/snapshot';
-import { SOCKET, type KdsEvent } from '@/lib/kds/types';
+import { getActiveTickets, getRecentDoneTickets, getTicket } from '@/lib/kds/snapshot';
+import { SOCKET, type KdsEvent, type KdsTicket } from '@/lib/kds/types';
 import { logger } from '@/lib/logger';
 import { closeSquareSyncQueue, startSquareSyncWorker, syncEnabled } from '@/lib/queue/square-sync';
 
@@ -66,6 +66,35 @@ app.prepare().then(async () => {
         if (row) io.to(roomFor(storeId)).emit(SOCKET.removed, { id: row.id, orderId: row.orderId });
       } catch (err) {
         logger.error({ err: err instanceof Error ? err.message : String(err), ticketId }, 'kds complete failed');
+      }
+    });
+
+    // "Recent" panel: the store's last completed tickets, replied via ack.
+    socket.on(SOCKET.recent, async (storeId: unknown, ack: (list: KdsTicket[]) => void) => {
+      if (typeof storeId !== 'string' || typeof ack !== 'function') return;
+      try {
+        ack(await getRecentDoneTickets(storeId));
+      } catch (err) {
+        logger.error({ err: err instanceof Error ? err.message : String(err), storeId }, 'kds recent failed');
+        ack([]);
+      }
+    });
+
+    // Bring a completed ticket back. startedAt is untouched, so its timer
+    // resumes from when the order first came in.
+    socket.on(SOCKET.recall, async (payload: unknown) => {
+      const { ticketId, storeId } = (payload ?? {}) as { ticketId?: string; storeId?: string };
+      if (!ticketId || !storeId) return;
+      try {
+        const [row] = await db
+          .update(kitchenTickets)
+          .set({ state: 'pending', completedAt: null })
+          .where(and(eq(kitchenTickets.id, ticketId), eq(kitchenTickets.state, 'done')))
+          .returning({ id: kitchenTickets.id });
+        const ticket = row ? await getTicket(row.id) : null;
+        if (ticket) io.to(roomFor(storeId)).emit(SOCKET.created, { ...ticket, recalled: true });
+      } catch (err) {
+        logger.error({ err: err instanceof Error ? err.message : String(err), ticketId }, 'kds recall failed');
       }
     });
   });

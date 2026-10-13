@@ -2,7 +2,9 @@ import Link from 'next/link';
 import { notFound } from 'next/navigation';
 import { getOrderDetail } from '@/lib/db/queries/orders';
 import { StatusBadge } from '@/components/dashboard/StatusBadge';
-import { money, orderNumber, dateTime, duration } from '@/lib/format';
+import { money, orderNumber, dateTime } from '@/lib/format';
+import { classifyModifier, isAllergyNote } from '@/lib/kds/modifiers';
+import { TicketTime } from '@/components/dashboard/TicketTime';
 
 // Full order detail, including the raw hydrated Square payload for debugging.
 export const dynamic = 'force-dynamic';
@@ -61,7 +63,7 @@ export default async function OrderDetailPage({
       </div>
 
       <div className="mt-6 grid gap-6 lg:grid-cols-[1fr_18rem]">
-        <div className="overflow-hidden rounded-[var(--radius-lg)] border border-[var(--rule)]">
+        <div className="overflow-hidden rounded-[var(--radius-lg)] border border-[var(--rule)] bg-bg-raised">
           <table className="w-full text-sm">
             <thead>
               <tr className="border-b border-[var(--rule)] text-left text-xs uppercase tracking-wide text-ink-3">
@@ -83,15 +85,45 @@ export default async function OrderDetailPage({
                   <tr key={item.id} className="border-b border-[var(--rule)] align-top">
                     <td className="px-4 py-2.5">
                       <div className="font-medium text-ink">{item.nameSnapshot}</div>
-                      {item.modifiers.map((m) => (
-                        <div key={m.id} className="text-ink-3">
-                          + {m.nameSnapshot}
-                          {m.priceCentsDelta !== 0 ? (
-                            <span className="ml-1 font-mono tabular-nums">{money(m.priceCentsDelta)}</span>
-                          ) : null}
+                      {/* Same NO / ADD / EXTRA tags as the kitchen board — a removal
+                          is never shown with a "+". */}
+                      {item.modifiers.map((m) => {
+                        const mod = classifyModifier(m.nameSnapshot);
+                        return (
+                          <div key={m.id} className="mt-0.5 flex items-baseline gap-2 text-sm">
+                            {mod.label ? (
+                              <span
+                                className="rounded-[var(--radius-sm)] px-1 text-[11px] font-bold leading-[1.5] tracking-wide"
+                                style={
+                                  mod.kind === 'remove'
+                                    ? { background: 'var(--status-red)', color: '#fff' }
+                                    : { background: '#0a69a8', color: '#fff' }
+                                }
+                              >
+                                {mod.label}
+                              </span>
+                            ) : (
+                              <span className="text-ink-3">•</span>
+                            )}
+                            <span className={mod.kind === 'remove' ? 'font-semibold text-danger' : 'text-ink-2'}>
+                              {mod.text}
+                            </span>
+                            {m.priceCentsDelta !== 0 ? (
+                              <span className="font-mono tabular-nums text-ink-3">{money(m.priceCentsDelta)}</span>
+                            ) : null}
+                          </div>
+                        );
+                      })}
+                      {item.notes ? (
+                        <div
+                          className={`mt-1 inline-block rounded-[var(--radius-sm)] px-1.5 text-sm font-medium ${
+                            isAllergyNote(item.notes) ? 'text-white' : 'text-ink'
+                          }`}
+                          style={{ background: isAllergyNote(item.notes) ? 'var(--status-red)' : '#f5df2e' }}
+                        >
+                          {isAllergyNote(item.notes) ? '⚠ ' : ''}“{item.notes}”
                         </div>
-                      ))}
-                      {item.notes ? <div className="mt-0.5 italic text-ink-2">“{item.notes}”</div> : null}
+                      ) : null}
                     </td>
                     <td className="px-4 py-2.5 text-right font-mono tabular-nums">{item.qty}</td>
                     <td className="px-4 py-2.5 text-right font-mono tabular-nums text-ink-2">
@@ -137,7 +169,7 @@ export default async function OrderDetailPage({
                 <Field label="Started">{dateTime(ticket.startedAt)}</Field>
                 {ticket.completedAt ? <Field label="Completed">{dateTime(ticket.completedAt)}</Field> : null}
                 <Field label={ticket.completedAt ? 'Ticket time' : 'In kitchen'}>
-                  <span className="font-mono tabular-nums">{duration(ticketSeconds)}</span>
+                  <TicketTime seconds={ticketSeconds} />
                 </Field>
               </dl>
             ) : (
@@ -181,7 +213,7 @@ export default async function OrderDetailPage({
         </aside>
       </div>
 
-      <details className="mt-6 rounded-[var(--radius-lg)] border border-[var(--rule)]">
+      <details className="mt-6 rounded-[var(--radius-lg)] border border-[var(--rule)] bg-bg-raised">
         <summary className="cursor-pointer px-4 py-2.5 text-sm text-ink-2 hover:text-ink">
           Raw Square payload
         </summary>

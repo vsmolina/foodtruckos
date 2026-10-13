@@ -1,8 +1,9 @@
 'use client';
 
-import { CartesianGrid, Line, LineChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts';
+import { CartesianGrid, Line, LineChart, ReferenceLine, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts';
 import type { TicketTimeDay } from '@/lib/db/queries/reports';
 import { duration } from '@/lib/format';
+import { AMBER_MS, DANGER_MS } from '@/lib/kds/tiers';
 import { chart, DOT_R, DURATION_STEPS, LINE_WIDTH, niceTicks } from './chart-theme';
 import { ChartTooltip } from './ChartTooltip';
 
@@ -11,8 +12,12 @@ const dayLabel = (day: string): string =>
 
 // Single series: no legend (the title names it). Days with no finished tickets
 // are gaps, not zeros; each day with data gets a dot so isolated days still show.
+// The KDS lateness thresholds are drawn as labelled hairlines, so "is this good?"
+// answers itself: the same 3 min (slow) / 7 min (late) the cooks see.
+const SLOW_S = AMBER_MS / 1000;
+const LATE_S = DANGER_MS / 1000;
 export function TicketTimeChart({ data }: { data: TicketTimeDay[] }): React.JSX.Element {
-  const yTicks = niceTicks(Math.max(...data.map((d) => d.avgSeconds ?? 0)), DURATION_STEPS);
+  const yTicks = niceTicks(Math.max(LATE_S, ...data.map((d) => d.avgSeconds ?? 0)), DURATION_STEPS);
   return (
     <ResponsiveContainer width="100%" height={chart.height}>
       <LineChart data={data} margin={{ top: 16, right: 24, bottom: 0, left: 0 }}>
@@ -34,6 +39,18 @@ export function TicketTimeChart({ data }: { data: TicketTimeDay[] }): React.JSX.
           tickLine={false}
           axisLine={false}
           width={52}
+        />
+        <ReferenceLine
+          y={SLOW_S}
+          stroke={chart.slow}
+          strokeWidth={1.5}
+          label={{ value: 'Slow · 3 min', position: 'insideTopLeft', fontSize: 12, fill: 'var(--ink-2)' }}
+        />
+        <ReferenceLine
+          y={LATE_S}
+          stroke={chart.late}
+          strokeWidth={1.5}
+          label={{ value: 'Late · 7 min', position: 'insideTopLeft', fontSize: 12, fill: 'var(--ink-2)' }}
         />
         <Tooltip
           isAnimationActive={false}

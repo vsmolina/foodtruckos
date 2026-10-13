@@ -54,14 +54,22 @@ test('an order appears on the board and can be completed', async ({ page, reques
   await expect(card.getByText('Mexican Burger')).toBeVisible();
   await expect(card.getByText('Horchata')).toBeVisible();
 
-  // Tap → two-step confirm (guards against a fat-finger during a rush).
+  // Tap arms it (bulges up); a second tap completes it and removes it everywhere.
   await card.click();
-  const dialog = page.getByRole('dialog');
-  await expect(dialog).toBeVisible();
-  await dialog.getByRole('button', { name: /Done/ }).click();
-
-  // Completing removes it from the board everywhere.
+  await expect(card).toHaveAttribute('aria-pressed', 'true');
+  await card.click();
   await expect(card).toBeHidden();
+
+  // Recent → Bring back puts it on the board again with its original start time.
+  await page.getByRole('button', { name: 'Recent' }).click();
+  const recent = page.getByRole('dialog', { name: 'Recent orders' });
+  await recent.getByRole('button', { name: `Bring back ${number}` }).click();
+  await recent.getByRole('button', { name: 'Close' }).click();
+  await expect(card).toBeVisible();
+
+  // A single tap auto-confirms after 1.5 s.
+  await card.click();
+  await expect(card).toBeHidden({ timeout: 4000 });
 });
 
 test('a card turns amber after 3 minutes', async ({ page, request }) => {
@@ -80,7 +88,25 @@ test('a card turns amber after 3 minutes', async ({ page, request }) => {
   // forward and the card recomputes its tier.
   await page.clock.fastForward('03:30');
 
-  // Amber tier: a 2px border in the dark-theme --warn colour (#e0a15a).
-  await expect(card).toHaveCSS('border-top-width', '2px');
-  await expect(card).toHaveCSS('border-top-color', 'rgb(224, 161, 90)');
+  // Amber tier: a 3px border in the KDS amber (--kds-amber, #f5b335).
+  await expect(card).toHaveCSS('border-top-width', '3px');
+  await expect(card).toHaveCSS('border-top-color', 'rgb(245, 179, 53)');
+});
+
+test('several tapped tickets each clear on their own countdown', async ({ page, request }) => {
+  await page.goto('/kds');
+  await waitForConnected(page);
+
+  const a = page.getByRole('button', { name: `Order ${await fireOrder(request)}, tap to complete` });
+  const b = page.getByRole('button', { name: `Order ${await fireOrder(request)}, tap to complete` });
+  await expect(a).toBeVisible();
+  await expect(b).toBeVisible();
+
+  // Tapping a second card no longer cancels the first: both count down.
+  await a.click();
+  await b.click();
+  await expect(a).toHaveAttribute('aria-pressed', 'true');
+  await expect(b).toHaveAttribute('aria-pressed', 'true');
+  await expect(a).toBeHidden({ timeout: 4000 });
+  await expect(b).toBeHidden({ timeout: 4000 });
 });

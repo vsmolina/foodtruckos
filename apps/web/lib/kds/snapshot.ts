@@ -1,4 +1,4 @@
-import { and, eq, inArray } from 'drizzle-orm';
+import { and, desc, eq, inArray } from 'drizzle-orm';
 import { db } from '@/lib/db/client';
 import {
   kitchenTickets,
@@ -14,6 +14,16 @@ function displayNumber(squareOrderId: string | null, fallbackId: string): string
   return `#${src.slice(-4).toUpperCase()}`;
 }
 
+const ticketColumns = {
+  ticketId: kitchenTickets.id,
+  state: kitchenTickets.state,
+  startedAt: kitchenTickets.startedAt,
+  completedAt: kitchenTickets.completedAt,
+  orderId: orders.id,
+  squareOrderId: orders.squareOrderId,
+  placedAt: orders.openedAt,
+};
+
 /**
  * All active kitchen tickets for a store, oldest first — replayed to a KDS
  * client on connect so a server restart never loses orders. "Active" =
@@ -21,14 +31,7 @@ function displayNumber(squareOrderId: string | null, fallbackId: string): string
  */
 export async function getActiveTickets(storeId: string): Promise<KdsTicket[]> {
   const rows = await db
-    .select({
-      ticketId: kitchenTickets.id,
-      state: kitchenTickets.state,
-      startedAt: kitchenTickets.startedAt,
-      orderId: orders.id,
-      squareOrderId: orders.squareOrderId,
-      placedAt: orders.openedAt,
-    })
+    .select(ticketColumns)
     .from(kitchenTickets)
     .innerJoin(orders, eq(kitchenTickets.orderId, orders.id))
     .where(
@@ -38,7 +41,43 @@ export async function getActiveTickets(storeId: string): Promise<KdsTicket[]> {
       ),
     )
     .orderBy(kitchenTickets.startedAt);
+  return withItems(rows);
+}
 
+/** The store's most recently completed tickets, newest first — the KDS "Recent" list. */
+export async function getRecentDoneTickets(storeId: string, limit = 12): Promise<KdsTicket[]> {
+  const rows = await db
+    .select(ticketColumns)
+    .from(kitchenTickets)
+    .innerJoin(orders, eq(kitchenTickets.orderId, orders.id))
+    .where(and(eq(orders.storeId, storeId), eq(kitchenTickets.state, 'done')))
+    .orderBy(desc(kitchenTickets.completedAt))
+    .limit(limit);
+  return withItems(rows);
+}
+
+/** One ticket by id (any state), or null. */
+export async function getTicket(ticketId: string): Promise<KdsTicket | null> {
+  const rows = await db
+    .select(ticketColumns)
+    .from(kitchenTickets)
+    .innerJoin(orders, eq(kitchenTickets.orderId, orders.id))
+    .where(eq(kitchenTickets.id, ticketId));
+  return (await withItems(rows))[0] ?? null;
+}
+
+type TicketRow = {
+  ticketId: string;
+  state: string;
+  startedAt: Date;
+  completedAt: Date | null;
+  orderId: string;
+  squareOrderId: string | null;
+  placedAt: Date;
+};
+
+/** Attach line items + modifiers to ticket rows, preserving row order. */
+async function withItems(rows: TicketRow[]): Promise<KdsTicket[]> {
   if (rows.length === 0) return [];
 
   const orderIds = rows.map((r) => r.orderId);
@@ -79,6 +118,7 @@ export async function getActiveTickets(storeId: string): Promise<KdsTicket[]> {
     state: r.state,
     startedAt: r.startedAt.toISOString(),
     placedAt: r.placedAt.toISOString(),
+    ...(r.completedAt ? { completedAt: r.completedAt.toISOString() } : {}),
     items: itemsByOrder.get(r.orderId) ?? [],
   }));
 }

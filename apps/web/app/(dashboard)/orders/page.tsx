@@ -1,6 +1,7 @@
 import Link from 'next/link';
 import { listOrders, ORDER_STATUSES, type OrderStatus } from '@/lib/db/queries/orders';
 import { StatusBadge } from '@/components/dashboard/StatusBadge';
+import { TicketTime } from '@/components/dashboard/TicketTime';
 import { money, orderNumber, dateTime } from '@/lib/format';
 
 // Order history: filters live in the URL (plain GET form), so every view is
@@ -57,12 +58,12 @@ export default async function OrdersPage({
   const last = Math.min(page * PAGE_SIZE, total);
 
   return (
-    <div className="mx-auto max-w-5xl">
-      <h1 className="font-display text-2xl text-ink">Orders</h1>
+    <div className="mx-auto max-w-6xl">
+      <h1 className="font-display text-3xl text-ink">Orders</h1>
 
       <form method="get" action="/orders" className="mt-4 flex flex-wrap items-end gap-x-6 gap-y-3">
         <label className="flex flex-col gap-1">
-          <span className="text-xs uppercase tracking-wide text-ink-3">Order #</span>
+          <span className="text-sm font-medium text-ink-2">Order #</span>
           <input
             type="search"
             name="q"
@@ -72,7 +73,7 @@ export default async function OrdersPage({
           />
         </label>
         <label className="flex flex-col gap-1">
-          <span className="text-xs uppercase tracking-wide text-ink-3">Status</span>
+          <span className="text-sm font-medium text-ink-2">Status</span>
           <select name="status" defaultValue={filters.status ?? ''} className={`${inputClass} w-32`}>
             <option value="">All</option>
             {ORDER_STATUSES.map((s) => (
@@ -83,17 +84,17 @@ export default async function OrdersPage({
           </select>
         </label>
         <label className="flex flex-col gap-1">
-          <span className="text-xs uppercase tracking-wide text-ink-3">From</span>
+          <span className="text-sm font-medium text-ink-2">From</span>
           <input type="date" name="from" defaultValue={filters.from} className={inputClass} />
         </label>
         <label className="flex flex-col gap-1">
-          <span className="text-xs uppercase tracking-wide text-ink-3">To</span>
+          <span className="text-sm font-medium text-ink-2">To</span>
           <input type="date" name="to" defaultValue={filters.to} className={inputClass} />
         </label>
         <div className="flex items-center gap-3">
           <button
             type="submit"
-            className="rounded-[var(--radius)] bg-accent px-3 py-1.5 text-sm font-medium text-accent-ink hover:opacity-90"
+            className="rounded-[var(--radius)] bg-accent px-4 py-2 text-sm font-semibold text-accent-ink hover:opacity-90"
           >
             Filter
           </button>
@@ -105,41 +106,46 @@ export default async function OrdersPage({
         </div>
       </form>
 
-      <div className="mt-6 overflow-hidden rounded-[var(--radius-lg)] border border-[var(--rule)]">
+      <div className="mt-6 overflow-hidden rounded-[var(--radius-lg)] border border-[var(--rule)] bg-bg-raised">
         {rows.length === 0 ? (
-          <div className="p-6 text-center text-sm text-ink-3">
+          <div className="p-6 text-center text-ink-3">
             {filtered ? 'No orders match these filters.' : 'No orders yet.'}
           </div>
         ) : (
-          <table className="w-full text-sm">
+          <table className="w-full">
             <thead>
-              <tr className="border-b border-[var(--rule)] text-left text-xs uppercase tracking-wide text-ink-3">
-                <th className="px-4 py-2 font-medium">Order</th>
-                <th className="px-4 py-2 font-medium">Status</th>
-                <th className="px-4 py-2 font-medium">Items</th>
-                <th className="px-4 py-2 text-right font-medium">Total</th>
-                <th className="px-4 py-2 text-right font-medium">Opened</th>
+              <tr className="border-b border-[var(--rule)] text-left text-sm text-ink-3">
+                <th className="w-px px-4 py-2 font-medium">Order</th>
+                <th className="px-4 py-2 font-medium">What</th>
+                <th className="w-px whitespace-nowrap px-4 py-2 text-right font-medium">Kitchen</th>
+                <th className="w-px whitespace-nowrap px-4 py-2 text-right font-medium">Total</th>
+                <th className="w-px whitespace-nowrap px-4 py-2 text-right font-medium">Opened</th>
               </tr>
             </thead>
             <tbody>
               {rows.map((o) => (
                 <tr key={o.id} className="border-b border-[var(--rule)] last:border-0 hover:bg-bg-sunken">
-                  <td className="px-4 py-2.5">
-                    <Link
-                      href={`/orders/${o.id}`}
-                      className="font-mono font-medium text-ink hover:text-accent"
-                    >
+                  <td className="whitespace-nowrap px-4 py-2.5">
+                    <Link href={`/orders/${o.id}`} className="font-mono font-semibold text-ink hover:text-accent">
                       {orderNumber(o.squareOrderId, o.id)}
                     </Link>
+                    {/* Fulfilled is the normal case: only the exceptions get a badge. */}
+                    {o.status !== 'fulfilled' ? (
+                      <span className="ml-2">
+                        <StatusBadge status={o.status} />
+                      </span>
+                    ) : null}
                   </td>
-                  <td className="px-4 py-2.5">
-                    <StatusBadge status={o.status} />
+                  <td className="max-w-0 truncate px-4 py-2.5 text-ink-2" title={o.itemSummary}>
+                    {o.itemSummary || `${o.itemCount} items`}
                   </td>
-                  <td className="px-4 py-2.5 text-ink-3">{o.itemCount}</td>
-                  <td className="px-4 py-2.5 text-right font-mono tabular-nums text-ink">
+                  <td className="whitespace-nowrap px-4 py-2.5 text-right">
+                    <TicketTime seconds={o.ticketSeconds} cooking={o.status === 'open'} />
+                  </td>
+                  <td className="whitespace-nowrap px-4 py-2.5 text-right font-mono tabular-nums text-ink">
                     {money(o.totalCents)}
                   </td>
-                  <td className="px-4 py-2.5 text-right text-ink-3">{dateTime(o.openedAt)}</td>
+                  <td className="whitespace-nowrap px-4 py-2.5 text-right text-ink-3">{dateTime(o.openedAt)}</td>
                 </tr>
               ))}
             </tbody>
@@ -148,7 +154,7 @@ export default async function OrdersPage({
       </div>
 
       {total > 0 ? (
-        <nav className="mt-3 flex items-center justify-between text-sm text-ink-3" aria-label="Pagination">
+        <nav className="mt-3 flex items-center justify-between text-sm text-ink-2" aria-label="Pagination">
           <span className="tabular-nums">
             {first}–{last} of {total}
           </span>

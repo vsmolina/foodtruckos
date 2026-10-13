@@ -36,6 +36,10 @@ export type OrderListRow = {
   status: OrderStatus;
   totalCents: number;
   itemCount: number;
+  /** "2× Mexican Burger, 1× Horchata". */
+  itemSummary: string;
+  /** Kitchen time (in → done) in seconds; null while still cooking. */
+  ticketSeconds: number | null;
   openedAt: string;
 };
 
@@ -82,6 +86,8 @@ export async function listOrders(filters: OrderFilters): Promise<OrderPage> {
     status: OrderStatus;
     total_cents: number;
     item_count: number;
+    item_summary: string | null;
+    ticket_seconds: number | null;
     opened_at: string;
   }>(sql`
     select
@@ -89,7 +95,11 @@ export async function listOrders(filters: OrderFilters): Promise<OrderPage> {
       o.square_order_id,
       o.status,
       o.total_cents,
-      (select count(*) from order_items oi where oi.order_id = o.id)::int as item_count,
+      (select coalesce(sum(oi.qty), 0) from order_items oi where oi.order_id = o.id)::int as item_count,
+      (select string_agg(oi.qty || '× ' || oi.name_snapshot, ', ' order by oi.id)
+         from order_items oi where oi.order_id = o.id) as item_summary,
+      (select extract(epoch from (kt.completed_at - kt.started_at))::float
+         from kitchen_tickets kt where kt.order_id = o.id) as ticket_seconds,
       o.opened_at
     from orders o
     ${where}
@@ -104,6 +114,8 @@ export async function listOrders(filters: OrderFilters): Promise<OrderPage> {
       status: r.status,
       totalCents: r.total_cents,
       itemCount: r.item_count,
+      itemSummary: r.item_summary ?? '',
+      ticketSeconds: r.ticket_seconds,
       openedAt: r.opened_at,
     })),
     total,

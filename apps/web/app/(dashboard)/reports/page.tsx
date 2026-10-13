@@ -22,16 +22,16 @@ function ChartCard({
   table: React.ReactNode;
 }): React.JSX.Element {
   return (
-    <section className="rounded-[var(--radius-lg)] border border-[var(--rule)] bg-bg-raised p-4">
-      <h2 className="font-display text-lg text-ink">{title}</h2>
-      <p className="text-xs text-ink-3">{subtitle}</p>
+    <section className="rounded-[var(--radius-lg)] border border-[var(--rule)] bg-bg-raised p-5">
+      <h2 className="font-display text-xl text-ink">{title}</h2>
+      <p className="text-sm text-ink-3">{subtitle}</p>
       {empty ? (
-        <div className="py-12 text-center text-sm text-ink-3">{empty}</div>
+        <div className="py-12 text-center text-ink-3">{empty}</div>
       ) : (
         <>
           <div className="mt-3">{chart}</div>
           <details className="mt-2 text-sm">
-            <summary className="cursor-pointer text-xs text-ink-3 hover:text-ink-2">Show data</summary>
+            <summary className="cursor-pointer text-sm text-ink-2 hover:text-ink">Show data</summary>
             <div className="mt-2 max-h-72 overflow-auto">{table}</div>
           </details>
         </>
@@ -44,7 +44,7 @@ function DataTable({ head, rows }: { head: string[]; rows: (string | number)[][]
   return (
     <table className="w-full text-sm">
       <thead>
-        <tr className="border-b border-[var(--rule)] text-left text-xs uppercase tracking-wide text-ink-3">
+        <tr className="border-b border-[var(--rule)] text-left text-sm text-ink-3">
           {head.map((h, i) => (
             <th key={h} className={`py-1.5 font-medium ${i > 0 ? 'text-right' : ''}`}>
               {h}
@@ -76,8 +76,8 @@ export default async function ReportsPage(): Promise<React.JSX.Element> {
   const hasTicketTimes = ticketTimes.some((d) => d.avgSeconds != null);
 
   return (
-    <div className="mx-auto max-w-5xl">
-      <h1 className="font-display text-2xl text-ink">Reports</h1>
+    <div className="mx-auto max-w-6xl">
+      <h1 className="font-display text-3xl text-ink">Reports</h1>
 
       <div className="mt-4 flex flex-col gap-6">
         <ChartCard
@@ -108,7 +108,7 @@ export default async function ReportsPage(): Promise<React.JSX.Element> {
 
           <ChartCard
             title="Average ticket time"
-            subtitle="Order in to ticket done, per day, last 30 days"
+            subtitle="Order in to ticket done, per day, last 30 days — against the kitchen’s slow (3 min) and late (7 min) marks"
             empty={hasTicketTimes ? null : 'No finished kitchen tickets in the last 30 days.'}
             chart={<TicketTimeChart data={ticketTimes} />}
             table={

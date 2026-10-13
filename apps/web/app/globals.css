@@ -1,20 +1,25 @@
 @import 'tailwindcss';
 
 /* Design system — see docs/03-DESIGN-SYSTEM.md. Light theme is the default
-   (dashboard/admin); the KDS opts into dark via [data-theme='dark']. */
+   (dashboard/admin). Same family as the KDS: white surfaces on a light warm
+   gray, near-black ink; every text token passes WCAG AA (4.5:1) on white and
+   on the page background. */
 :root {
-  --bg: #f6f1e8;
-  --bg-raised: #fbf7ef;
-  --bg-sunken: #efe8da;
+  --bg: #f1eee9;
+  --bg-raised: #ffffff;
+  --bg-sunken: #e9e5de;
   --ink: #14110e;
-  --ink-2: #3b352e;
-  --ink-3: #7a6f62;
-  --rule: #e0d6c4;
-  --accent: #c8441e;
+  --ink-2: #3a332b;
+  --ink-3: #6b6257;
+  --rule: #ddd6ca;
+  --accent: #b03a17;
   --accent-ink: #ffffff;
   --success: #2f6a3f;
-  --warn: #b5701a;
-  --danger: #a12e1c;
+  --warn: #8a5208;
+  --danger: #b02a16;
+  /* Status fills (same as the KDS ticket header tiers). */
+  --status-amber: #f5b335;
+  --status-red: #d12f1a;
 
   /* Design faces (docs/03-DESIGN-SYSTEM.md). Self-host from /public/fonts to
      render the real faces; until then these fall back gracefully. */
@@ -47,6 +52,53 @@
   --danger: #d94f35;
 }
 
+/* Kitchen display: tuned for a glance from 1–2 m, in daylight. Light board,
+   white cards, near-black ink (dark-on-light reads fastest; in daylight it's at
+   least even with dark mode). Status colours come from the Okabe–Ito
+   colour-blind-safe set (vermillion / blue / amber / yellow), darkened to pass
+   4.5:1 on white, and are always paired with a word, never colour alone. */
+[data-kds] {
+  --bg: #e9e6e0;
+  --bg-raised: #ffffff;
+  --ink: #14110e;
+  --ink-2: #3a332b;
+  --ink-3: #6b6257;
+  --rule: #cfc8bc;
+  --kds-amber: #f5b335;
+  --kds-amber-ink: #1a1206;
+  --kds-red: #d12f1a;
+  --kds-red-ink: #ffffff;
+  --kds-no: #c2321a;
+  --kds-add: #0a69a8;
+  --kds-add-ink: #ffffff;
+  --kds-note: #f5df2e;
+  --kds-note-ink: #17160a;
+  --kds-card-shadow: 0 1px 2px rgba(20, 17, 14, 0.12), 0 2px 8px -2px rgba(20, 17, 14, 0.1);
+  /* Base size scales with the screen (whichever of width/height is tighter),
+     times the cook's own text-size setting (--kds-scale, footer − / +). */
+  font-size: calc(var(--kds-scale, 1) * clamp(16px, min(1.9vw, 3.2vh), 56px));
+  line-height: 1.25;
+}
+
+@keyframes kds-countdown {
+  from {
+    width: 100%;
+  }
+  to {
+    width: 0%;
+  }
+}
+
+@keyframes kds-alarm {
+  0%,
+  100% {
+    background-color: var(--kds-red);
+  }
+  50% {
+    background-color: #9e2312;
+  }
+}
+
 @theme inline {
   --color-bg: var(--bg);
   --color-bg-raised: var(--bg-raised);
@@ -70,8 +122,8 @@ body {
   background: var(--bg);
   color: var(--ink);
   font-family: var(--font-sans);
-  font-size: 15px;
-  line-height: 1.55;
+  font-size: 16px;
+  line-height: 1.5;
 }
 
 /* KDS card state animations. Degrade to nothing under reduced-motion. */

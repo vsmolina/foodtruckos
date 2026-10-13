@@ -18,6 +18,10 @@ export type KdsTicket = {
   startedAt: string;
   /** When the order was placed (bottom-bar time), ISO string. */
   placedAt: string;
+  /** When the kitchen finished it (recently-done list only), ISO string. */
+  completedAt?: string;
+  /** Brought back from the Recent panel (shown as a RECALLED flag). */
+  recalled?: boolean;
   items: KdsTicketItem[];
 };
 
@@ -36,4 +40,8 @@ export const SOCKET = {
   updated: 'ticket:updated',
   removed: 'ticket:removed',
   complete: 'ticket:complete',
+  /** Client asks for recently completed tickets; server replies via ack. */
+  recent: 'ticket:recent',
+  /** Put a completed ticket back on the board, keeping its original start time. */
+  recall: 'ticket:recall',
 } as const;

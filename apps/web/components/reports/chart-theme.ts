@@ -4,24 +4,27 @@
 // Color jobs (validated with the dataviz palette checker on --bg-raised):
 // - `emphasis` (--accent) marks the one series a chart is about, e.g. "today".
 // - `context` (--ink-3) is the de-emphasis gray for comparison series; it is
-//   always dashed + legended, so identity never rests on color alone.
-// - `mark` (--ink-2) is the single-series default.
+//   always a different mark shape + legended, so identity never rests on color.
+// - `mark` is the single-series default: categorical slot 1 (blue), lighter
+//   than near-black ink so the data isn't the heaviest thing on the page.
 export const chart = {
   emphasis: 'var(--accent)',
   context: 'var(--ink-3)',
-  mark: 'var(--ink-2)',
+  mark: '#2a78d6',
   surface: 'var(--bg-raised)',
   grid: 'var(--rule)',
   hover: 'var(--bg-sunken)',
-  tick: { fill: 'var(--ink-3)', fontSize: 11, fontFamily: 'var(--font-mono)' },
+  tick: { fill: 'var(--ink-3)', fontSize: 12, fontFamily: 'var(--font-mono)' },
   height: 260,
+  late: 'var(--status-red)',
+  slow: 'var(--status-amber)',
 } as const;
 
 // Mark specs: 2px lines, >= 8px end markers with a 2px surface ring, bars capped
 // at 24px with a 4px rounded data-end.
 export const LINE_WIDTH = 2;
 export const DOT_R = 4;
-export const BAR_SIZE = 18;
+export const BAR_SIZE = 20;
 
 /** 0 → "12a", 13 → "1p". */
 export function hourLabel(h: number): string {

@@ -14,6 +14,7 @@
     "square:locations": "tsx --env-file-if-exists=../../.env scripts/square-locations.ts",
     "square:register-webhook": "tsx --env-file-if-exists=../../.env scripts/register-square-webhook.ts",
     "square:sandbox-order": "tsx --env-file-if-exists=../../.env scripts/create-sandbox-order.ts",
+    "square:sandbox-rush": "tsx --env-file-if-exists=../../.env scripts/sandbox-rush.ts",
     "mock:square": "tsx --env-file-if-exists=../../.env scripts/mock-square.ts",
     "test:e2e": "playwright test"
   },
