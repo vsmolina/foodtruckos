@@ -1,5 +1,9 @@
 import { test, expect, type APIRequestContext } from '@playwright/test';
 import { createHmac, randomUUID } from 'node:crypto';
+import { clearBoard } from './global-setup';
+
+// Each test opens an empty board; one test's leftover cards must not hide another's.
+test.beforeEach(clearBoard);
 
 // A correctly-signed thin `order.created` webhook, exactly as Square sends one.
 // The server (SQUARE_MOCK=1) hydrates it from a fixture: 2× Mexican Burger
@@ -97,8 +101,12 @@ test('several tapped tickets each clear on their own countdown', async ({ page, 
   await page.goto('/kds');
   await waitForConnected(page);
 
-  const a = page.getByRole('button', { name: `Order ${await fireOrder(request)}, tap to complete` });
-  const b = page.getByRole('button', { name: `Order ${await fireOrder(request)}, tap to complete` });
+  const a = page.getByRole('button', {
+    name: `Order ${await fireOrder(request)}, tap to complete`,
+  });
+  const b = page.getByRole('button', {
+    name: `Order ${await fireOrder(request)}, tap to complete`,
+  });
   await expect(a).toBeVisible();
   await expect(b).toBeVisible();
 

@@ -1,4 +1,4 @@
-# Status — where things stand (paused 2026-10-12)
+# Status — where things stand (updated 2026-10-14)
 
 Picking this up later? Read this first, then the [README](../README.md).
 
@@ -18,8 +18,7 @@ Square **sandbox**:
 
 ### Session 2026-10-12 — KDS on the Pi + redesign
 
-Tested on the real Raspberry Pi with a sandbox "lunch rush". Committed locally
-(`a842905`), not pushed yet:
+Tested on the real Raspberry Pi with a sandbox "lunch rush" (`a842905`):
 
 - **Pi works.** `next.config.ts` now allows the Mac's LAN IPs as `allowedDevOrigins`
   (the Pi showed "Offline" without it) and hides the Next dev indicator.
@@ -92,12 +91,11 @@ gallery page".
 
 ## Where the code is
 
-- Branch **`feat/phase-4-dashboard`**, pushed to GitHub up to `b017dc7`; the
-  2026-10-12 commits are local — `git push` them.
-- `main` on GitHub is still the end of Phase 2 — **the PR has not been opened yet**.
-  Open it here, using the description at the bottom:
-  https://github.com/vsmolina/foodtruckos/compare/main...feat/phase-4-dashboard?expand=1
-- Title: `Phases 3–5: KDS, dashboard, Square menu sync, Docker + docs`
+- Everything is on **`main`**: PR #1 (https://github.com/vsmolina/foodtruckos/pull/1)
+  merged `feat/customer-site`, covering Phases 3–5 and everything since.
+- Checked before merging (2026-10-14): KDS e2e suite passes against a production
+  build (3/3); the Docker image builds and starts (migrations run, `/api/health`
+  reports db and redis ok); `docs/03-DESIGN-SYSTEM.md` describes the light KDS.
 
 ## How to start it again (this Mac)
 
@@ -114,21 +112,21 @@ Pi kiosk: `apps/web/scripts/pi-kiosk-setup.sh <mac-lan-ip> <store-id> 3010` (Mac
 
 ## Next steps (in order)
 
-1. **Push the 2026-10-12 commits** and run the e2e suite against a prod build
-   (`tests/e2e/kds.spec.ts` was updated for arm/auto-confirm/recall but **not run**).
-2. **Update `docs/03-DESIGN-SYSTEM.md`** — it still says the KDS is dark, lists the old
-   colours and describes the removed confirm modal.
-3. **Open and merge the PR** (link above).
-4. **Automatic menu pull from Square** (not built): subscribe to
+1. **Owner setup for the website** (`apps/site/README.md`): connect Instagram
+   (Website → Gallery), submit "Meta oEmbed Read" for App Review, create the
+   Vercel / Neon / Stripe / Twilio / Resend accounts and set the env vars
+   (incl. `CRON_SECRET`, `INSTAGRAM_APP_ID`, `INSTAGRAM_CLIENT_TOKEN`); logo,
+   photos, story copy, real hours and partners; legal review.
+2. **Automatic menu pull from Square** (not built): subscribe to
    `catalog.version.updated` (add it to `EVENT_TYPES` in
    `scripts/register-square-webhook.ts`), handle it in
    `app/api/webhooks/square/route.ts` by queueing a debounced (~10 s) `pullCatalog()`
    that waits while local pushes are pending; show "Updated from Square N min ago" on
    the Menu page. Test on sandbox first.
-5. **Square POS check:** change a price in Menu → it shows on the POS device. Confirm
+3. **Square POS check:** change a price in Menu → it shows on the POS device. Confirm
    with Victor that the POS rings up **itemized** orders (custom amounts arrive with no items).
-6. **Real menu:** enter Victor's real items in the Square dashboard.
-7. **Go live on the truck's mini PC** (README → "Deploy to the truck's mini PC"), with a
+4. **Real menu:** enter Victor's real items in the Square dashboard.
+5. **Go live on the truck's mini PC** (README → "Deploy to the truck's mini PC"), with a
    clean database — not this Mac's sandbox data:
    - `.env`: `SQUARE_ENVIRONMENT=production`, production `SQUARE_ACCESS_TOKEN`,
      `SQUARE_APPLICATION_ID`, `SQUARE_LOCATION_ID` (`pnpm --filter web square:locations`).
@@ -139,7 +137,7 @@ Pi kiosk: `apps/web/scripts/pi-kiosk-setup.sh <mac-lan-ip> <store-id> 3010` (Mac
      signature key → `SQUARE_WEBHOOK_SIGNATURE_KEY`. Restart.
    - Re-point the Cloudflare tunnel hostname from this Mac to the mini PC.
    - Point the Pi at the mini PC; ring a $1 real order end to end, then refund it.
-8. **Use it for two weeks** before any new features; then pick Phase 6 from
+6. **Use it for two weeks** before any new features; then pick Phase 6 from
    [`BACKLOG.md`](BACKLOG.md).
 
 ## Gotchas to remember
@@ -152,44 +150,3 @@ Pi kiosk: `apps/web/scripts/pi-kiosk-setup.sh <mac-lan-ip> <store-id> 3010` (Mac
 - The repo is **public**: never commit `.env`. Commit author email is visible — GitHub
   Settings → Emails → "Keep my email addresses private" to hide it going forward.
 
----
-
-## Pending PR description
-
-> ## Summary
->
-> Brings `main` up to the end of Phase 5: the Kitchen Display, the owner dashboard,
-> two-way Square menu sync, and a working Docker stack + docs.
->
-> - **Phase 3 — KDS** (`/kds`): Socket.IO board fed by Redis; webhook → ticket on
->   screen; tap to complete.
-> - **Phase 4 — Dashboard**: email + password login (single admin); Today metrics,
->   `/orders` (filters, pagination), `/orders/[id]` (incl. raw Square payload),
->   `/reports` (Recharts), `/settings/menu` (menu CRUD).
-> - **Phase 5 — Square menu sync**: saves push to the Square Catalog via a BullMQ queue
->   (retries with backoff, sync badges, Retry); "Pull from Square" import; pushes to a
->   _production_ catalog are refused until a pull has run once.
-> - **Fixes found while testing**: out-of-order / concurrent Square webhooks; Turbopack
->   dev memory runaway (vercel/next.js#94915); Docker stack rebuilt so
->   `docker compose up` works on a fresh machine.
-> - **Docs**: README rewritten; `docs/BACKLOG.md`; `docs/STATUS.md`.
->
-> ## Migrations
->
-> `0002` (users.password_hash) and `0003` (Square version + sync status columns,
-> stores.catalog_pulled_at). Both additive; they run automatically on container start.
->
-> ## Test plan
->
-> - [x] Square sandbox: real orders → webhooks via tunnel → order, payment, ticket stored
-> - [x] Concurrency: 5 parallel ingests of one order → 0 failures (4 without the fix)
-> - [x] `/orders`, `/reports`: 10k synthetic orders, p95 ≤ 30 ms; chart numbers match SQL
-> - [x] `/settings/menu`: full CRUD; server-side validation; forged cookie → /login
-> - [x] Menu sync: price edit reached Square in 0.7 s (spec: 30 s); delete; Pull;
->       forced error → retries → Sync failed → Retry; 9/9 items identical
-> - [x] Docker from scratch: builds (no `.env` inside); webhook → live ticket; LAN login
-> - [ ] Price change visible on a physical Square POS
-> - [ ] KDS on the Raspberry Pi with a real order
-> - [ ] Production cut-over: real menu in Square → Pull → production credentials
->
-> 🤖 Generated with [Claude Code](https://claude.com/claude-code)
