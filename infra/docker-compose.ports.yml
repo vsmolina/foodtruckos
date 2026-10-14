@@ -1,0 +1,16 @@
+# Host-dev overlay: publish Postgres + Redis on the host so `pnpm dev` (running
+# on the Mac, outside Docker) can reach them. Off-standard ports so they don't
+# collide with another local Postgres/Redis. Start just the data services:
+#   docker compose -f infra/docker-compose.yml -f infra/docker-compose.ports.yml up -d postgres redis
+# Matching .env:
+#   DATABASE_URL=postgresql://foodtruck:foodtruck@localhost:5433/foodtruck
+#   REDIS_URL=redis://localhost:6380
+# Not for production — there Postgres/Redis stay on the internal network only.
+
+services:
+  postgres:
+    ports:
+      - '127.0.0.1:${POSTGRES_HOST_PORT:-5433}:5432'
+  redis:
+    ports:
+      - '127.0.0.1:${REDIS_HOST_PORT:-6380}:6379'

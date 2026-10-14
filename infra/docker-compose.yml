@@ -1,8 +1,10 @@
-# Base stack: Postgres + Redis + the web app.
+# Base stack: Postgres + Redis + the web app (+ optional Cloudflare Tunnel).
 # Postgres/Redis are reachable only on the internal Docker network — not the host.
-# Run from the repo root:
-#   docker compose -f infra/docker-compose.yml up
-# For local dev (mounts the repo, runs pnpm dev), add the dev overlay:
+# Run from the repo root (reads ./.env — copy .env.example first):
+#   docker compose -f infra/docker-compose.yml up -d
+# With the public tunnel (needs CLOUDFLARE_TUNNEL_TOKEN in .env):
+#   docker compose -f infra/docker-compose.yml --profile tunnel up -d
+# For local dev (mounts the repo, hot reload), add the dev overlay:
 #   docker compose -f infra/docker-compose.yml -f infra/docker-compose.dev.yml up
 
 services:
@@ -44,10 +46,19 @@ services:
       context: ..
       dockerfile: infra/Dockerfile.web
     restart: unless-stopped
+    # App settings (auth, Square, admin login…) come from the repo's .env;
+    # the values below override the host-oriented ones for inside Docker.
+    env_file:
+      - path: ../.env
+        required: false
     environment:
       NODE_ENV: production
+      PORT: '3000'
       DATABASE_URL: postgresql://${POSTGRES_USER:-foodtruck}:${POSTGRES_PASSWORD:-foodtruck}@postgres:5432/${POSTGRES_DB:-foodtruck}
       REDIS_URL: redis://redis:6379
+      # Empty → Auth.js uses the request's own host (trustHost), so login works
+      # from localhost, the truck LAN IP, and the tunnel hostname alike.
+      AUTH_URL: ''
     # Host port is configurable — another local project may already hold 3000.
     ports:
       - '${WEB_PORT:-3000}:3000'
@@ -73,11 +84,12 @@ services:
   # endpoint. Remotely-managed (token) tunnel: the public hostname → service
   # mapping (route your hostname to http://web:3000) is configured in the
   # Cloudflare Zero Trust dashboard. Outbound-only; no ports published.
-  # Set CLOUDFLARE_TUNNEL_TOKEN in .env. Omit this service and it simply won't start.
+  # Opt-in: only starts with `--profile tunnel` (it crash-loops without a token).
   cloudflared:
     image: cloudflare/cloudflared:latest
+    profiles: ['tunnel']
     restart: unless-stopped
-    command: tunnel --no-autoupdate run --token ${CLOUDFLARE_TUNNEL_TOKEN}
+    command: tunnel --no-autoupdate run --token ${CLOUDFLARE_TUNNEL_TOKEN:-}
     depends_on:
       web:
         condition: service_healthy

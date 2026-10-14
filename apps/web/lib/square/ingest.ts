@@ -1,4 +1,4 @@
-import { eq, inArray } from 'drizzle-orm';
+import { eq, inArray, sql } from 'drizzle-orm';
 import type * as Square from 'square';
 import { db } from '@/lib/db/client';
 import {
@@ -11,7 +11,9 @@ import {
 } from '@/lib/db/schema';
 import { logger } from '@/lib/logger';
 import { publish } from '@/lib/realtime/channel';
+import type { KdsTicket } from '@/lib/kds/types';
 import { retrieveOrder } from './client';
+import { isUnpaidWebOrder, setPickupState } from './pickup';
 
 /** BigInt cents → number cents. Square amounts are always minor units. */
 function cents(m: Square.Money | null | undefined): number {
@@ -62,17 +64,7 @@ function displayNumber(squareOrderId: string): string {
   return `#${squareOrderId.slice(-4).toUpperCase()}`;
 }
 
-type TicketEvent = {
-  type: 'ticket:created' | 'ticket:updated' | 'ticket:removed';
-  ticket: {
-    id: string;
-    orderId: string;
-    number: string;
-    state: string;
-    startedAt: string;
-    items: { qty: number; name: string; notes: string | null; modifiers: string[] }[];
-  };
-};
+type TicketEvent = { type: 'ticket:created' | 'ticket:updated' | 'ticket:removed'; ticket: KdsTicket };
 
 /**
  * Upsert a hydrated Square order into our tables and (re)create its kitchen
@@ -94,6 +86,11 @@ export async function upsertOrder(sqOrder: Square.Order): Promise<void> {
   const subtotalCents = Math.max(0, totalCents - taxCents - tipCents);
 
   const event = await db.transaction(async (tx): Promise<TicketEvent | null> => {
+    // Square fires order.created and order.updated near-simultaneously. Serialize
+    // per order so the second event sees the first's row (and the version guard)
+    // instead of racing it into a unique-violation on square_order_id.
+    await tx.execute(sql`select pg_advisory_xact_lock(hashtext(${squareOrderId}))`);
+
     const existing = await tx
       .select()
       .from(orders)
@@ -188,18 +185,24 @@ export async function upsertOrder(sqOrder: Square.Order): Promise<void> {
           .returning();
       }
       if (!ticket) return null;
-      return { type: 'ticket:removed', ticket: toTicketPayload(ticket, orderRow.id, squareOrderId, items) };
+      return { type: 'ticket:removed', ticket: toTicketPayload(ticket, orderRow, items) };
     }
+
+    // Website orders reach the kitchen once paid (the payment's order.updated
+    // brings them back here with a tender).
+    if (!ticket && isUnpaidWebOrder(sqOrder)) return null;
 
     if (!ticket) {
       [ticket] = await tx.insert(kitchenTickets).values({ orderId: orderRow.id }).returning();
       if (!ticket) throw new Error('failed to create kitchen ticket');
-      return { type: 'ticket:created', ticket: toTicketPayload(ticket, orderRow.id, squareOrderId, items) };
+      return { type: 'ticket:created', ticket: toTicketPayload(ticket, orderRow, items) };
     }
-    return { type: 'ticket:updated', ticket: toTicketPayload(ticket, orderRow.id, squareOrderId, items) };
+    return { type: 'ticket:updated', ticket: toTicketPayload(ticket, orderRow, items) };
   });
 
   if (event) {
+    // A website pickup order just reached the board → "Preparing" on the customer's status page.
+    if (event.type === 'ticket:created') void setPickupState(squareOrderId, 'RESERVED', { onlyFrom: ['PROPOSED'] });
     await publish(`kds:store:${storeId}`, event);
     logger.info({ squareOrderId, type: event.type }, 'kds event published');
   }
@@ -207,16 +210,16 @@ export async function upsertOrder(sqOrder: Square.Order): Promise<void> {
 
 function toTicketPayload(
   ticket: typeof kitchenTickets.$inferSelect,
-  orderId: string,
-  squareOrderId: string,
-  items: TicketEvent['ticket']['items'],
-): TicketEvent['ticket'] {
+  order: typeof orders.$inferSelect,
+  items: KdsTicket['items'],
+): KdsTicket {
   return {
     id: ticket.id,
-    orderId,
-    number: displayNumber(squareOrderId),
+    orderId: order.id,
+    number: displayNumber(order.squareOrderId ?? order.id),
     state: ticket.state,
     startedAt: ticket.startedAt.toISOString(),
+    placedAt: order.openedAt.toISOString(),
     items,
   };
 }
@@ -236,6 +239,7 @@ export type RawPayment = {
   amount_money?: RawMoney | null;
   tip_money?: RawMoney | null;
   status?: string | null;
+  version?: number | null;
   card_details?: { card?: { card_brand?: string | null } | null } | null;
 };
 
@@ -264,8 +268,18 @@ export async function ingestPayment(payment: RawPayment): Promise<void> {
     rawPayload: toJsonSafe(payment),
   };
 
+  // Square doesn't deliver webhooks in order: payment.created (v1, APPROVED) can
+  // land after payment.updated (v2+, COMPLETED). Only overwrite with a newer
+  // version; the stored version lives in raw_payload.
+  const version = payment.version;
   await db
     .insert(payments)
     .values(values)
-    .onConflictDoUpdate({ target: payments.squarePaymentId, set: values });
+    .onConflictDoUpdate({
+      target: payments.squarePaymentId,
+      set: values,
+      ...(version != null && {
+        setWhere: sql`coalesce((${payments.rawPayload}->>'version')::int, -1) < ${version}`,
+      }),
+    });
 }

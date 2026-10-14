@@ -75,6 +75,60 @@ the full webhook → hydrate → DB → Redis flow locally.
 
 ---
 
+## A2. KDS end-to-end (Playwright)
+
+`apps/web/tests/e2e/kds.spec.ts` drives the whole live path in a real browser:
+fire a signed `order.created` → ingest → DB → Redis → Socket.IO → the ticket
+renders on the board → tap → confirm → it clears. A second test fast-forwards the
+board clock to assert the 3-minute amber tier.
+
+```bash
+pnpm --filter web test:e2e
+```
+
+Playwright starts its own web server on port `3100` (`KDS_TEST_PORT`) in
+`SQUARE_MOCK=1` mode, so no Square account or network is needed. It still needs a
+live, migrated + seeded Postgres and Redis.
+
+**Two things to know:**
+
+- **It builds and runs a *production* server, not `dev`.** The
+  `webServer.command` is `next build && tsx server.ts` (first run pays the ~15s
+  build; `reuseExistingServer` skips it locally on re-runs), so the test runs
+  the same code path as the truck.
+
+  History: `dev` used to wedge with the KDS open (webhook POSTs hung) and once
+  forked node processes until macOS hit its per-user process limit. Since
+  `server.ts` gained graceful shutdown (it releases the port, Socket.IO, Redis
+  and Postgres on SIGTERM so `tsx watch` restarts don't stack servers), neither
+  reproduces: re-checked 2026-10-03 with Chrome on `/kds`, `[HMR] connected`,
+  live hot reload, `tsx watch` restarts, and three signed webhooks (all 200,
+  tickets rendered live) — process count flat at 2–3. If it ever recurs, watch
+  `ps -ax | grep -c node` and stop `pnpm dev` before the box runs out of
+  processes.
+
+  Separately, Turbopack's persistent dev cache (`.next/dev/cache`) made the
+  dev server's memory climb ~30 MB/s while idle after the first compile, until
+  "JavaScript heap out of memory" (~6 min; vercel/next.js#94915, Next 16.2.x).
+  Webpack dev and a fresh cache stayed flat, so `next.config.ts` turns the
+  cache off (`experimental.turbopackFileSystemCacheForDev: false`). Verified:
+  all six pages compiled, then RSS flat at ~1.8 GB for 4 min. If memory climbs
+  again, `rm -rf apps/web/.next/dev` and check that flag.
+
+- **Point it at the right DB/Redis if 5432/6379 are taken.** The config defaults
+  to the standard localhost ports, but `infra/docker-compose.yml` publishes
+  Postgres/Redis on *ephemeral* host ports (no fixed host mapping), and another
+  stack may already own 5432/6379. Check `docker ps` for the real ports and
+  override:
+
+  ```bash
+  DATABASE_URL=postgresql://foodtruck:foodtruck@localhost:5433/foodtruck \
+  REDIS_URL=redis://localhost:6380 \
+  pnpm --filter web test:e2e
+  ```
+
+---
+
 ## B. Real Square sandbox
 
 ### 1. Get your Location ID

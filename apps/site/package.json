@@ -1,0 +1,53 @@
+{
+  "name": "site",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "dev": "next dev --port ${SITE_PORT:-3020}",
+    "build": "next build",
+    "start": "next start --port ${SITE_PORT:-3020}",
+    "lint": "eslint",
+    "typecheck": "tsc --noEmit",
+    "db:generate": "drizzle-kit generate",
+    "db:migrate": "tsx --env-file-if-exists=.env lib/db/migrate.ts",
+    "db:seed": "tsx --env-file-if-exists=.env lib/db/seed.ts",
+    "admin:hash-password": "tsx scripts/hash-password.ts",
+    "square:sync-menu": "tsx --conditions=react-server --env-file-if-exists=.env scripts/sync-menu.ts",
+    "test:e2e": "playwright test"
+  },
+  "dependencies": {
+    "@vercel/blob": "^2.8.1",
+    "bcryptjs": "^3.0.3",
+    "drizzle-orm": "^0.45.2",
+    "jose": "^6.2.12",
+    "next": "16.2.10",
+    "postgres": "^3.4.9",
+    "qrcode": "^1.5.4",
+    "react": "19.2.4",
+    "react-dom": "19.2.4",
+    "resend": "^6.32.1",
+    "server-only": "^0.0.1",
+    "square": "^44.2.0",
+    "stripe": "^23.0.0",
+    "twilio": "^6.2.0",
+    "uuidv7": "^1.2.1",
+    "zod": "^4.6.7",
+    "@barrio/site-contract": "workspace:*"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.61.1",
+    "@tailwindcss/postcss": "^4.3.2",
+    "@types/bcryptjs": "^3.0.0",
+    "@types/node": "^20.19.43",
+    "@types/qrcode": "^1.5.6",
+    "@types/react": "^19.2.17",
+    "@types/react-dom": "^19.2.3",
+    "drizzle-kit": "^0.31.10",
+    "eslint": "^9.39.4",
+    "eslint-config-next": "16.2.10",
+    "eslint-config-prettier": "^10.1.8",
+    "tailwindcss": "^4.3.2",
+    "tsx": "^4.22.5",
+    "typescript": "^5.9.3"
+  }
+}

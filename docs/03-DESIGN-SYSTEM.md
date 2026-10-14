@@ -10,7 +10,7 @@
 
 We commit to one direction: **refined, editorial, high-contrast with a single warm accent.** Cream background (not pure white — pure white is harsh on the Pi display and in bright food-truck lighting), near-black text, one saturated accent color that earns its place by appearing only on actionable elements and critical states.
 
-The kitchen display uses the same system but inverts the background to deep charcoal — readable across a greasy kitchen at arm's length.
+The kitchen display uses the same system on a **light board**: white cards on a light grey background with near-black ink, readable from 1–2 m in a sunny truck (dark-on-light reads fastest; in daylight it is at least even with a dark screen).
 
 This is a working tool. It should feel like it was designed by someone who respects the person using it during a dinner rush.
 
@@ -46,7 +46,7 @@ All headings use `text-wrap: balance`. All body copy uses `text-wrap: pretty`.
 
 ## Color
 
-One palette, two themes (light for dashboard/admin, dark for KDS). Kitchen display always dark.
+One palette. The dashboard/admin use the light theme; the KDS uses its own light board tokens (below). The dark tokens remain in `globals.css` but nothing uses them today.
 
 ### Light theme (dashboard, admin, POS)
 
@@ -65,27 +65,32 @@ One palette, two themes (light for dashboard/admin, dark for KDS). Kitchen displ
 --danger: #a12e1c; /* deeper red than accent */
 ```
 
-### Dark theme (KDS only)
+### KDS board (`[data-kds]` in `apps/web/app/globals.css`)
 
 ```css
---bg: #161310;
---bg-raised: #1f1c18;
---bg-sunken: #0f0d0b;
---ink: #f2eadc;
---ink-2: #beb4a3;
---ink-3: #7e7566;
---rule: #2a2520;
---accent: #e86a3e; /* slightly brighter for dark bg */
---accent-ink: #0f0d0b;
---success: #6ba778;
---warn: #e0a15a;
---danger: #d94f35;
+--bg: #e9e6e0; /* light grey board */
+--bg-raised: #ffffff; /* cards */
+--ink: #14110e;
+--ink-2: #3a332b;
+--ink-3: #6b6257;
+--rule: #cfc8bc;
+--kds-amber: #f5b335; /* Slow (≥ 3 min) */
+--kds-amber-ink: #1a1206;
+--kds-red: #d12f1a; /* Late (≥ 7 min), allergy banner */
+--kds-red-ink: #ffffff;
+--kds-no: #c2321a; /* NO … modifiers */
+--kds-add: #0a69a8; /* ADD / EXTRA modifiers */
+--kds-add-ink: #ffffff;
+--kds-note: #f5df2e; /* free-text notes */
+--kds-note-ink: #17160a;
 ```
+
+Status colours come from the Okabe–Ito colour-blind-safe set (vermillion, blue, amber, yellow), darkened to pass 4.5:1 on white, and are paired with a word or position, never colour alone: LATE, NO, ADD and EXTRA are spelled out, and Slow is carried by the header colour plus the timer (the dashboard writes the word "Slow").
 
 ### Rules
 
 - `--accent` appears only on: primary action buttons, the active nav item, critical state indicators, focused form controls (via ring). **Never as a background for large areas.** Never as a gradient.
-- States on KDS cards use `--ink` / `--warn` / `--danger` borders and subtle background tint (8% opacity max). Never fill the whole card in red.
+- KDS lateness colours the card **header** and a 3px border (`--kds-amber`, `--kds-red`); the card body stays white. Never fill the whole card.
 - Success messages use `--success`, not green checkmarks plastered everywhere.
 - Destructive actions get a two-step confirm, not just a red button.
 
@@ -166,27 +171,29 @@ Respect `prefers-reduced-motion`. All motion should degrade to 0ms duration when
 
 ### KDS (most important — this is where Victor lives)
 
-- Fixed layout. No scrolling. No scrollbars.
-- 4 columns × 2 rows grid. Exact percentages: `grid-template-columns: repeat(4, 1fr)` with `gap: 12px`, identical for rows.
-- Each card fills its cell. Internal layout:
+- Fixed board, no page scrolling. **4 columns on wide screens (≥ 1180px), 3 on a small Pi panel**, 2 rows (`components/kds/KdsBoard.tsx`).
+- Text size scales with the screen (`clamp(16px, min(1.9vw, 3.2vh), 56px)`) times the cook's own **A− / A+** setting on the footer, saved per screen.
+- Each card:
   ```
   ┌────────────────────────────────┐
-  │ #142              03:47        │  ← order number + timer, top bar
+  │ #142              03:47        │  ← order number + timer; header turns amber / red
   ├────────────────────────────────┤
+  │ ⚠ ALLERGY: peanuts             │  ← red banner when a note mentions an allergy
   │ 2× Bacon Burger                │
-  │   - no onion                   │  ← items + modifiers
+  │   NO onion                     │  ← red NO tag
+  │   EXTRA cheese                 │  ← blue ADD / EXTRA tag
+  │   "well done"                  │  ← yellow note
   │ 1× Sonoran Dog                 │
-  │   - extra beans                │
-  │                                │
-  │                                │
   ├────────────────────────────────┤
-  │ To-go             8:42 PM     │  ← fulfillment + order time, bottom bar
+  │ To-go             8:42 PM      │  ← fulfillment + order time
   └────────────────────────────────┘
   ```
-- **Timer sits top-right in JetBrains Mono, always visible.** Font size adjusts with card size.
-- When elapsed > 3 min → card gains 2px amber border + `--warn` tinted background (6% opacity).
-- When elapsed > 7 min → card gains 2px danger border + subtle pulse keyframe (1.5s cycle, opacity 1 → 0.95 → 1). Not aggressive; visible but not panic-inducing.
-- Tap target is the entire card. Confirm modal uses `--shadow-pop` and darkens the rest of the screen with `rgba(0,0,0,0.4)`.
+- **Timer sits top-right in JetBrains Mono, always visible.**
+- **Slow** (≥ 3 min, `lib/kds/tiers.ts`): amber header + 3px amber border.
+- **Late** (≥ 7 min): red header with the word LATE + 3px red border. The header pulses 3 times when it turns late, then holds (constant motion stops being noticed and floods the board).
+- Long orders become **tall cards** (2 rows); once tapped, a card's items scroll inside it. When cards don't fit, the last slot is a dashed **"+N more waiting"** tile.
+- **Completing (no modal):** tap a card and it lifts and _arms_, with a countdown bar and Cancel / ✓ Done buttons. A second tap or 1.5 s completes it. Several cards can be armed at once, each on its own countdown; scrolling or dragging an armed card pauses its countdown.
+- **Recent** (footer) lists finished tickets; **Bring back** returns one to the board with its original start time.
 
 ### Settings/admin
 
@@ -217,7 +224,7 @@ No shadcn-dump. Copy only the patterns you need.
 
 **Phosphor Icons**, `regular` weight, 1.25px stroke at 20px size. One weight only for consistency. Do not mix with Lucide or Heroicons. Do not use emoji as icons.
 
-For the KDS, the only icon used is a small checkmark on the complete-confirm modal; the rest of the interface relies on text and typographic hierarchy.
+For the KDS, the only symbols used are ✓ on an armed card's Done button and ⚠ on the allergy banner; the rest of the interface relies on text and typographic hierarchy.
 
 ---
 
@@ -236,7 +243,7 @@ For the KDS, the only icon used is a small checkmark on the complete-confirm mod
 ## CSS architecture
 
 - **Tailwind v4** with a `@theme` block that maps every token above to Tailwind utilities.
-- Custom properties on `:root` (light theme) and on `[data-theme="dark"]` for KDS.
+- Custom properties on `:root` (light theme) and on `[data-kds]` for the KDS board.
 - Global styles in `app/globals.css`: font-face, root vars, sensible resets.
 - **No inline styles except for dynamic values** (timer color state, grid cell width calculations).
 - **No `@apply` in random files** — keep Tailwind utilities inline in JSX. Save `@apply` for the rare shared primitive.
@@ -258,9 +265,9 @@ Example `app/globals.css` starter:
   --font-mono: 'JetBrains Mono', ui-monospace, monospace;
 }
 
-[data-theme='dark'] {
-  --bg: #161310;
-  /* ... all tokens from §Color dark theme ... */
+[data-kds] {
+  --bg: #e9e6e0;
+  /* ... all tokens from §Color KDS board ... */
 }
 
 html,
@@ -289,7 +296,7 @@ body {
 - Emojis used as visual anchors or status.
 - `rounded-xl` or `rounded-2xl` — we use `--radius` (4px) as the default.
 - Gradients on buttons.
-- A dark mode toggle on the dashboard. (No. Dashboard is light; KDS is dark. One purpose each.)
+- A dark mode toggle on the dashboard or KDS. (No. Both are light, tuned for daylight in a truck.)
 - Using `Inter` anywhere.
 - Border + shadow + background-color all together on one element.
 - Animations longer than 600ms on interactive elements.

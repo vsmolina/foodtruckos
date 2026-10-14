@@ -8,6 +8,27 @@
       "when": 1783045798394,
       "tag": "0000_fixed_sumo",
       "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "7",
+      "when": 1784322274424,
+      "tag": "0001_smooth_norrin_radd",
+      "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1791041792075,
+      "tag": "0002_white_toad_men",
+      "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "7",
+      "when": 1791052866895,
+      "tag": "0003_illegal_praxagora",
+      "breakpoints": true
     }
   ]
 }

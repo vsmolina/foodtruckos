@@ -1,0 +1,15 @@
+# Keep the build context small and secret-free. Dependencies are installed
+# inside the image (linux binaries differ from the macOS host's).
+**/node_modules
+.pnpm-store
+apps/web/.next
+apps/web/test-results
+apps/web/playwright-report
+.git
+*.log
+
+# Secrets: passed at runtime via env_file, never baked into an image.
+.env
+.env.*
+!.env.example
+infra/cloudflared

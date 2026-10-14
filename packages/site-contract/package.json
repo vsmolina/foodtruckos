@@ -1,0 +1,12 @@
+{
+  "name": "@barrio/site-contract",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Types-only contract for the website admin API (apps/site serves it, apps/web calls it). Import with `import type` only.",
+  "types": "./src/index.ts",
+  "exports": {
+    ".": {
+      "types": "./src/index.ts"
+    }
+  }
+}

@@ -12,7 +12,7 @@
     "build": "pnpm --filter web build",
     "start": "pnpm --filter web start",
     "lint": "pnpm --filter web lint",
-    "test": "pnpm --filter web test",
+    "test": "pnpm --filter web test:e2e",
     "format": "prettier --write .",
     "format:check": "prettier --check ."
   },
